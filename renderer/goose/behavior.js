@@ -219,6 +219,7 @@ export class Behavior {
       this._batteryIcon = { x: wa.x + wa.width - 130, y: wa.y + 12 }; // estimate
     }
     this.events.requestMenuPos && this.events.requestMenuPos('battery'); // refine async
+    this.resetIntent(); // interrupting sleep must clear intent.sleep or the goose slides around seated
     this.task = this.makeTask('announce', { text, urgent });
     this.gapT = 0;
   }
@@ -412,6 +413,7 @@ export class Behavior {
     A.facing = Math.sign(this.cursor.x - A.bodyX) || A.facing;
     A.gait.reset(A.bodyX / A.S, A.facing);
     // …then charge to a spot right beside you.
+    this.resetIntent(); // may interrupt sleep: clear intent.sleep so the sprint is on its feet
     this.task = this.makeTask('catchup', {
       x: this.clampX(this.cursor.x + away * 170),
       y: this.clampY(this.cursor.y + 150),
@@ -431,6 +433,7 @@ export class Behavior {
 
   // A distraction was spotted: sprint over, honk it down, then main closes it.
   enforce({ id, label, x }) {
+    this.resetIntent(); // may interrupt sleep: clear intent.sleep so the sprint is on its feet
     this.task = this.makeTask('enforce', { id, label, x });
     this.gapT = 0;
   }

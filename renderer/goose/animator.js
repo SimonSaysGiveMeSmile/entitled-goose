@@ -260,8 +260,11 @@ export class GooseAnimator {
     for (const px of plants) this.events.footPlant(px * S, this.bodyY, this.facing);
 
     // ---- Sleep settle ----
+    // Waking while already in motion (startled by a distraction or a space
+    // switch) snaps upright fast — legs must be visible from the first steps.
     const sleepTarget = intent.sleep ? 1 : 0;
-    this.sleepAmt += clamp(sleepTarget - this.sleepAmt, -dt * 1.5, dt * 1.5);
+    const settleRate = sleepTarget === 0 && speed > 30 ? 5 : 1.5;
+    this.sleepAmt += clamp(sleepTarget - this.sleepAmt, -dt * settleRate, dt * settleRate);
 
     // ---- Action timeline ----
     let squash = 0;

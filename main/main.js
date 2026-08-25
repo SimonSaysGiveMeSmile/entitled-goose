@@ -185,7 +185,8 @@ app.whenReady().then(() => {
 
   // Global cursor position: permission-free polling from the main process.
   // Also: multi-display follow — if the cursor dwells on another display for
-  // ~4s, the overlay moves there and the goose sprints in after you.
+  // ~2s, the overlay moves there and the goose sprints in after you. Short
+  // enough to feel like following, long enough to ignore drive-by crossings.
   let otherDisplayPolls = 0;
   setInterval(() => {
     const p = screen.getCursorScreenPoint();
@@ -195,7 +196,7 @@ app.whenReady().then(() => {
     const windowDisplay = screen.getDisplayMatching(win.getBounds());
     if (cursorDisplay.id !== windowDisplay.id) {
       otherDisplayPolls++;
-      if (otherDisplayPolls >= 120) { // ~4s at 33ms
+      if (otherDisplayPolls >= 60) { // ~2s at 33ms
         otherDisplayPolls = 0;
         win.setBounds(cursorDisplay.workArea);
         applyOverlayFlags();
