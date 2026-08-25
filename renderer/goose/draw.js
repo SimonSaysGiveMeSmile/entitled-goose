@@ -4,63 +4,60 @@
 // Units: standing height = 1.0. No outlines anywhere; separation by value only.
 
 export const PALETTE = {
-  body: '#ECECEC',
-  bodyShade: 'rgba(90, 90, 95, 0.07)',
+  body: '#FBFBF9', // site body white
+  bodyShade: 'rgba(226, 225, 219, 0.6)', // site #e2e1db @ .6 belly patch
   orange: '#F58731',
   orangeFar: '#DF7A2B',
-  mouth: '#FF8829',
   eye: '#272725',
   honkLine: '#FFFFFF',
-  shadow: 'rgba(20, 20, 25, 0.10)',
+  shadow: 'rgba(39, 39, 37, 0.10)', // site shadow ink
 };
 
+// The landing-page goose SVG (220x185 viewBox), converted 1:1 into local
+// units: divide site coords by 149.5 (feet y=177 minus head top y=27.5),
+// x-centered on site x=96. Standing height = 1.0 exactly.
 export const GEO = {
-  neckRoot: { x: 0.165, y: -0.40 },
-  neckSegments: 5,
-  neckLength: 0.52,
-  headRx: 0.072, // MUST match the drawHead ellipse (drawn size, not aspiration)
-  headRy: 0.056,
-  hipNear: { x: 0.015, y: -0.175 },
-  hipFar: { x: -0.035, y: -0.185 },
-  legUpper: 0.105,
-  legLower: 0.105,
-  restHead: { x: 0.135, y: -0.73 },
+  neckRoot: { x: 0.281, y: -0.408 }, // site shoulder (138,116)
+  headRx: 0.104, // MUST match the drawHead ellipse (site rx 15.5)
+  headRy: 0.084, // site ry 12.5
+  hipNear: { x: 0.045, y: -0.167 },
+  hipFar: { x: -0.005, y: -0.172 },
+  legUpper: 0.10,
+  legLower: 0.10,
+  restHead: { x: 0.355, y: -0.916 }, // site rest head (149,40)
 };
 
-// Authored neck rest pose: an upright S that settles slightly BACKWARD over
-// the body (how a relaxed goose actually carries it), head barely leading.
+// Neck rest pose: even samples of the site's authored rest quadratic
+// (M138,116 Q146,78 148,44) — tall, nearly upright, gently forward.
 export function neckRestPose(bodyDY = 0) {
   const r = GEO.neckRoot;
-  // Segment lengths taper toward the head: long and mobile at the base,
-  // short and stiff at the skull.
   const pts = [
     { x: r.x, y: r.y },
-    { x: r.x + 0.012, y: r.y - 0.080 },
-    { x: r.x + 0.002, y: r.y - 0.157 },
-    { x: r.x - 0.009, y: r.y - 0.226 },
-    { x: r.x + 0.003, y: r.y - 0.285 },
-    { x: r.x + 0.016, y: r.y - 0.317 },
+    { x: r.x + 0.020, y: r.y - 0.101 },
+    { x: r.x + 0.036, y: r.y - 0.199 },
+    { x: r.x + 0.050, y: r.y - 0.296 },
+    { x: r.x + 0.060, y: r.y - 0.390 },
+    { x: r.x + 0.067, y: r.y - 0.482 },
   ];
   for (const p of pts) p.y += bodyDY;
   return pts;
 }
 
 function bodyPath(ctx, dy, tailWag) {
-  // Long, low teardrop: deep chest front-bottom, near-horizontal back sweeping
-  // up to a sharp raised tail spike — the #2 silhouette identifier.
-  const ty = -0.575 + dy + tailWag;
+  // The site body, converted 1:1: chest high at right, swooping belly, long
+  // rising sweep to the raised tail point at back-left.
+  const ty = -0.689 + dy + tailWag; // tail spike tip (site 22,74)
   ctx.beginPath();
-  ctx.moveTo(0.175, -0.415 + dy); // neck root shoulder
-  ctx.bezierCurveTo(0.280, -0.405 + dy, 0.330, -0.330 + dy, 0.318, -0.240 + dy); // chest
-  ctx.bezierCurveTo(0.305, -0.145 + dy, 0.195, -0.100 + dy, 0.045, -0.100 + dy); // belly front
-  ctx.bezierCurveTo(-0.095, -0.100 + dy, -0.225, -0.130 + dy, -0.285, -0.200 + dy); // belly rear
-  ctx.bezierCurveTo(-0.345, -0.270 + dy, -0.400, -0.470 + dy, -0.430, ty); // under-tail to spike tip
-  ctx.bezierCurveTo(-0.330, -0.508 + dy, -0.205, -0.462 + dy, -0.060, -0.450 + dy); // back (near-flat)
-  ctx.bezierCurveTo(0.040, -0.443 + dy, 0.120, -0.432 + dy, 0.175, -0.415 + dy); // to shoulder
+  ctx.moveTo(0.401, -0.381 + dy); // chest top (site 156,120)
+  ctx.bezierCurveTo(0.401, -0.234 + dy, 0.241, -0.140 + dy, 0.054, -0.140 + dy); // chest → belly
+  ctx.bezierCurveTo(-0.134, -0.140 + dy, -0.294, -0.194 + dy, -0.348, -0.301 + dy); // belly rear
+  ctx.bezierCurveTo(-0.401, -0.408 + dy, -0.441, -0.542 + dy, -0.495, ty); // under-tail → spike
+  ctx.bezierCurveTo(-0.348, -0.595 + dy, -0.187, -0.595 + dy, 0.000, -0.582 + dy); // back
+  ctx.bezierCurveTo(0.214, -0.569 + dy, 0.401, -0.528 + dy, 0.401, -0.381 + dy); // to chest top
   ctx.closePath();
 }
 
-function drawLeg(ctx, hip, knee, ankle, color, width = 0.036) {
+function drawLeg(ctx, hip, knee, ankle, color, width = 0.047) { // site stroke 7
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.lineCap = 'round';
@@ -108,8 +105,8 @@ function drawNeck(ctx, pts, color) {
   // A ribbon polygon's flat end edge can poke past the rotated head at
   // extreme angles (lowest head position). A round line cap is a semicircle
   // centered on the stroke end, and the end is TRIMMED 0.014 short of the
-  // chain tip so cap radius (0.042) + head-center offset (~0.025) always
-  // stays inside the drawn head ellipse (0.072x0.056) at any rotation.
+  // chain tip so cap radius (0.0535) + head-center offset always stays
+  // inside the drawn head ellipse (0.104x0.084) at any rotation.
   const samples = sampleCatmullRom(rooted, 20);
   const n = samples.length;
   const end = samples[n - 1];
@@ -118,7 +115,7 @@ function drawNeck(ctx, pts, color) {
   end.x -= ((end.x - prev2.x) / el) * 0.014;
   end.y -= ((end.y - prev2.y) / el) * 0.014;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 0.084;
+  ctx.lineWidth = 0.107; // site stroke-width 16
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -156,75 +153,40 @@ function drawHead(ctx, head, opts) {
   ctx.translate(head.x, head.y);
   ctx.rotate(angle);
 
-  const beakLen = 0.147 * (1 - 0.40 * faceCamera);
-  const bx = 0.040; // beak hinge x relative to head center (shared pivot)
-  const upperRot = -beakOpen * 0.30;
-  const lowerRot = beakOpen * 0.40;
-
-  // Mouth interior: strictly between the two mandible lines, shorter than
-  // the beaks so it can never poke past them.
-  if (beakOpen > 0.12) {
-    ctx.fillStyle = PALETTE.mouth;
-    ctx.beginPath();
-    ctx.moveTo(bx + 0.004, 0.004);
-    ctx.lineTo(bx + Math.cos(upperRot) * beakLen * 0.78, 0.004 + Math.sin(upperRot) * beakLen * 0.78);
-    ctx.lineTo(bx + Math.cos(lowerRot) * beakLen * 0.70, 0.004 + Math.sin(lowerRot) * beakLen * 0.70);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Both mandibles hinge on the SAME pivot so they never cross or overlap
-  // awkwardly. Closed, the lower nests fully under the upper.
+  // The site head, converted 1:1: one beak shape hinged UNDER the skull
+  // (site g-beak, translate(13,-2), rotate(-open*15deg)), then the skull
+  // ellipse over it, then a single eye. faceCamera foreshortens the beak.
+  const fc = 1 - 0.40 * faceCamera;
+  ctx.save();
+  ctx.translate(0.087 * fc, -0.013);
+  ctx.rotate(-beakOpen * 0.26);
   ctx.fillStyle = PALETTE.orange;
-
-  // Lower mandible: thin, shorter, tucked under.
-  ctx.save();
-  ctx.translate(bx, 0.004);
-  ctx.rotate(lowerRot);
   ctx.beginPath();
-  ctx.moveTo(-0.008, 0.000);
-  ctx.quadraticCurveTo(beakLen * 0.62, 0.000, beakLen * 0.82, 0.005);
-  ctx.quadraticCurveTo(beakLen * 0.55, 0.016, -0.008, 0.013);
+  ctx.moveTo(0, -0.040);
+  ctx.quadraticCurveTo(0.134 * fc, -0.033, 0.174 * fc, 0.007);
+  ctx.quadraticCurveTo(0.127 * fc, 0.047, 0, 0.040);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
-  // Upper bill: flat top line, blunt tip, slight downturn.
-  ctx.save();
-  ctx.translate(bx, 0.004);
-  ctx.rotate(upperRot);
-  ctx.beginPath();
-  ctx.moveTo(-0.012, -0.026);
-  ctx.quadraticCurveTo(beakLen * 0.70, -0.028, beakLen * 0.96, -0.012);
-  ctx.quadraticCurveTo(beakLen * 1.04, -0.002, beakLen * 0.92, 0.004);
-  ctx.quadraticCurveTo(beakLen * 0.6, 0.008, -0.012, 0.006);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // Head: slightly egg-shaped, long axis horizontal.
+  // Skull (site ellipse rx 15.5 ry 12.5).
   ctx.fillStyle = PALETTE.body;
   ctx.beginPath();
-  // Smaller egg-shaped head, long axis horizontal ("real goose, not mascot").
-  ctx.ellipse(-0.014, -0.006, 0.072 * (1 + 0.06 * faceCamera), 0.056, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 0.104 * (1 + 0.06 * faceCamera), 0.084, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eye(s): tiny dot, high and forward, no highlight — all expressiveness
-  // lives in the pose, none in the face.
-  const eyeY = -0.025;
-  const drawEye = (ex) => {
-    ctx.fillStyle = PALETTE.eye;
-    if (eyelid > 0.6) {
-      ctx.fillRect(ex - 0.008, eyeY - 0.001, 0.016, 0.003); // flat closed-eye line
-    } else {
-      ctx.beginPath();
-      ctx.arc(ex, eyeY, 0.010, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  };
-  // Single eye always — a two-eyed frontal goose is lowkey creepy. The ¾ turn
-  // reads through the foreshortened beak instead.
-  drawEye(0.014 - 0.020 * faceCamera);
+  // Single eye always — a two-eyed frontal goose is lowkey creepy. The ¾
+  // turn reads through the foreshortened beak instead. (site: r 2.6 @ 4,-4)
+  const eyeY = -0.027;
+  const ex = 0.027 - 0.030 * faceCamera;
+  ctx.fillStyle = PALETTE.eye;
+  if (eyelid > 0.6) {
+    ctx.fillRect(ex - 0.014, eyeY - 0.002, 0.028, 0.005); // flat closed-eye line
+  } else {
+    ctx.beginPath();
+    ctx.arc(ex, eyeY, 0.0174, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -253,10 +215,10 @@ function drawEllipsisBubble(ctx, head) {
 //          eyelid, faceCamera, showBubble, legs:{near:{hip,knee,ankle,droop},
 //          far:{...}}, shadowW }
 export function drawGoose(ctx, state) {
-  // Contact shadow.
+  // Contact shadow (site ellipse cx100 cy176 rx72 ry5).
   ctx.fillStyle = PALETTE.shadow;
   ctx.beginPath();
-  ctx.ellipse(-0.02, -0.012, state.shadowW ?? 0.30, 0.032, 0, 0, Math.PI * 2);
+  ctx.ellipse(0.027, -0.006, state.shadowW ?? 0.48, 0.033, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Far leg + foot (darker orange).
@@ -266,29 +228,27 @@ export function drawGoose(ctx, state) {
     drawFoot(ctx, f.ankle, f.droop, PALETTE.orangeFar);
   }
 
-  // Neck UNDER the body: the breast occludes the base, so the join is
-  // seamless at every roll and reach angle — a neck drawn on top shows as a
-  // flat band across the body's shade gradient and a loose seam at the root.
-  drawNeck(ctx, state.neckPts, PALETTE.body);
-
-  // Body with weight-shift roll.
+  // Body with weight-shift roll — FLAT site fill plus the site's single
+  // belly shade patch (no gradient: flat fill is what makes the neck-over-
+  // body join invisible, exactly like the SVG).
   ctx.save();
   ctx.rotate(state.roll * 0.5);
   bodyPath(ctx, state.bodyDY, state.tailWag);
   ctx.fillStyle = PALETTE.body;
   ctx.fill();
-  // One soft shade pass, clipped to the body: darker toward belly/rear.
-  ctx.save();
-  bodyPath(ctx, state.bodyDY, state.tailWag);
-  ctx.clip();
-  const g = ctx.createLinearGradient(0.1, -0.5 + state.bodyDY, -0.15, -0.1 + state.bodyDY);
-  g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(1, PALETTE.bodyShade);
-  ctx.fillStyle = g;
-  ctx.fillRect(-0.5, -0.7, 1.0, 0.7);
-  ctx.restore();
+  // Site shade patch: M60,144 C80,154 110,156 128,150 C110,156 76,156 60,144
+  ctx.fillStyle = PALETTE.bodyShade;
+  ctx.beginPath();
+  ctx.moveTo(-0.241, -0.221 + state.bodyDY);
+  ctx.bezierCurveTo(-0.107, -0.154 + state.bodyDY, 0.094, -0.140 + state.bodyDY, 0.214, -0.181 + state.bodyDY);
+  ctx.bezierCurveTo(0.094, -0.140 + state.bodyDY, -0.134, -0.140 + state.bodyDY, -0.241, -0.221 + state.bodyDY);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 
+  // Neck OVER the body, head over the neck — the site's z-order. Flat same-
+  // color fills make every overlap seamless.
+  drawNeck(ctx, state.neckPts, PALETTE.body);
   drawHead(ctx, state.head, state);
 
   if (state.showBubble) drawEllipsisBubble(ctx, state.head);

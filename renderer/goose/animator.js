@@ -25,11 +25,11 @@ const HONK_SOUND_T = 0.18;
 // Keep the neck target within (slightly under) chain reach so the solver
 // never fully straightens the neck into a pole, and never sees a wild target.
 function clampNeckTarget(root, tx, ty) {
-  if (!Number.isFinite(tx + ty)) return { x: root.x, y: root.y - 0.33 };
+  if (!Number.isFinite(tx + ty)) return { x: root.x, y: root.y - 0.51 };
   const dx = tx - root.x;
   const dy = ty - root.y;
   const d = Math.hypot(dx, dy);
-  const maxR = 0.33; // shorter, site-matched neck
+  const maxR = 0.549; // site REACH 82/149.5
   if (d <= maxR) return { x: tx, y: ty };
   return { x: root.x + (dx / d) * maxR, y: root.y + (dy / d) * maxR };
 }
@@ -162,9 +162,9 @@ export class GooseAnimator {
   beakWorld() {
     const h = this.headWorld();
     return {
-      // Drawn bill tip = beak hinge (0.040) + 1.04 * beakLen (0.147) from
+      // Drawn bill tip = site beak hinge (0.087) + tip reach (0.174) from
       // the head origin — keep in sync with drawHead or honk vfx drift.
-      x: h.x + this.facing * 0.193 * this.S,
+      x: h.x + this.facing * 0.261 * this.S,
       y: h.y,
     };
   }
@@ -172,10 +172,10 @@ export class GooseAnimator {
   bounds() {
     const S = this.S;
     return {
-      x: this.bodyX - 0.42 * S,
-      y: this.bodyY - 1.02 * S,
-      w: 0.84 * S,
-      h: 1.04 * S,
+      x: this.bodyX - 0.55 * S,
+      y: this.bodyY - 1.06 * S,
+      w: 1.10 * S,
+      h: 1.08 * S,
     };
   }
 
@@ -308,7 +308,7 @@ export class GooseAnimator {
       const dx = tgt.x - restX;
       const dy = tgt.y - restY;
       const d = Math.hypot(dx, dy) || 1;
-      const reach = 0.21 * S;
+      const reach = 0.30 * S;
       this.headTX = restX - this.facing * 0.07 * S * squash + (dx / d) * reach * extend;
       this.headTY = restY + (dy / d) * reach * extend * 0.7;
       snapHalflife = 0.035;
@@ -346,11 +346,11 @@ export class GooseAnimator {
       // (verified against the body bezier; lower floors bury the head when
       // the cursor hovers the goose). Near the root, direction is noise —
       // hold the last look instead of whipping around the shoulder.
-      const r = clamp(d, 0.30 * S, 0.33 * S);
+      const r = Math.min(d, 0.549 * S); // site: r = min(d, REACH), no floor
       let tx = root.x + (dx / d) * r;
-      // Site head-dip clamp (shoulder.y + 24 at REACH 82): gaze goes down,
-      // the head itself stays up — pecks reach lower via the action branch.
-      let ty = Math.min(root.y + (dy / d) * r, root.y + 0.29 * r);
+      // Site head-dip clamp (shoulder.y + 24): gaze goes down, the head
+      // itself stays up — pecks reach lower via the action branch.
+      let ty = Math.min(root.y + (dy / d) * r, root.y + 0.161 * S);
       const retarget = !this.lastLookTarget
         || (d > 0.10 * S && Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 0.082 * S);
       if (retarget) this.lastLookTarget = { x: tx, y: ty };
@@ -447,7 +447,7 @@ export class GooseAnimator {
       faceCamera: this.faceCamera,
       showBubble: !!intent.showBubble,
       legs,
-      shadowW: 0.30 - this.sleepAmt * 0.02,
+      shadowW: 0.48 - this.sleepAmt * 0.03,
       sleeping: this.sleepAmt > 0.5,
     };
   }
@@ -508,7 +508,7 @@ export class GooseAnimator {
       faceCamera: 0,
       showBubble: false,
       legs: { near: mkDangle(GEO.hipNear, 1), far: mkDangle(GEO.hipFar, -1) },
-      shadowW: 0.30 * Math.max(0.25, 1 - (this.minBodyY() - Math.min(this.bodyY, this.minBodyY())) / (0.9 * S) - this.dragAmt * 0.3),
+      shadowW: 0.48 * Math.max(0.25, 1 - (this.minBodyY() - Math.min(this.bodyY, this.minBodyY())) / (0.9 * S) - this.dragAmt * 0.3),
       sleeping: false,
     };
   }
