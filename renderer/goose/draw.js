@@ -165,47 +165,52 @@ function drawHead(ctx, head, opts) {
   ctx.rotate(angle);
 
   const beakLen = 0.125 * (1 - 0.40 * faceCamera);
-  const bx = 0.042; // beak root x relative to head center
+  const bx = 0.040; // beak hinge x relative to head center (shared pivot)
+  const upperRot = -beakOpen * 0.30;
+  const lowerRot = beakOpen * 0.40;
 
-  // Open-mouth interior (visible only when beak opens).
-  if (beakOpen > 0.05) {
+  // Mouth interior: strictly between the two mandible lines, shorter than
+  // the beaks so it can never poke past them.
+  if (beakOpen > 0.12) {
     ctx.fillStyle = PALETTE.mouth;
     ctx.beginPath();
-    ctx.moveTo(bx, -0.006);
-    ctx.lineTo(bx + beakLen * 0.92, -0.004 - beakOpen * 0.052);
-    ctx.lineTo(bx + beakLen * 0.86, 0.010 + beakOpen * 0.062);
+    ctx.moveTo(bx + 0.004, 0.004);
+    ctx.lineTo(bx + Math.cos(upperRot) * beakLen * 0.78, 0.004 + Math.sin(upperRot) * beakLen * 0.78);
+    ctx.lineTo(bx + Math.cos(lowerRot) * beakLen * 0.70, 0.004 + Math.sin(lowerRot) * beakLen * 0.70);
     ctx.closePath();
     ctx.fill();
   }
 
-  // Upper beak: rounded wedge, tip slightly downturned.
+  // Both mandibles hinge on the SAME pivot so they never cross or overlap
+  // awkwardly. Closed, the lower nests fully under the upper.
   ctx.fillStyle = PALETTE.orange;
+
+  // Lower mandible: thin, shorter, tucked under.
   ctx.save();
-  ctx.translate(bx, -0.004);
-  ctx.rotate(-beakOpen * 0.42);
+  ctx.translate(bx, 0.004);
+  ctx.rotate(lowerRot);
   ctx.beginPath();
-  // Flatter goose bill: nearly straight top line, blunt rounded tip.
-  ctx.moveTo(-0.012, -0.022);
-  ctx.quadraticCurveTo(beakLen * 0.70, -0.024, beakLen * 0.96, -0.008);
-  ctx.quadraticCurveTo(beakLen * 1.04, 0.002, beakLen * 0.92, 0.010);
-  ctx.quadraticCurveTo(beakLen * 0.6, 0.015, -0.012, 0.012);
+  ctx.moveTo(-0.008, 0.000);
+  ctx.quadraticCurveTo(beakLen * 0.62, 0.000, beakLen * 0.82, 0.005);
+  ctx.quadraticCurveTo(beakLen * 0.55, 0.016, -0.008, 0.013);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
-  // Lower beak.
+  // Upper bill: flat top line, blunt tip, slight downturn.
   ctx.save();
-  ctx.translate(bx, 0.008);
-  ctx.rotate(beakOpen * 0.55);
+  ctx.translate(bx, 0.004);
+  ctx.rotate(upperRot);
   ctx.beginPath();
-  ctx.moveTo(-0.010, -0.002);
-  ctx.quadraticCurveTo(beakLen * 0.66, -0.002, beakLen * 0.86, 0.006);
-  ctx.quadraticCurveTo(beakLen * 0.6, 0.022, -0.010, 0.018);
+  ctx.moveTo(-0.012, -0.026);
+  ctx.quadraticCurveTo(beakLen * 0.70, -0.028, beakLen * 0.96, -0.012);
+  ctx.quadraticCurveTo(beakLen * 1.04, -0.002, beakLen * 0.92, 0.004);
+  ctx.quadraticCurveTo(beakLen * 0.6, 0.008, -0.012, 0.006);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
 
   // Head: slightly egg-shaped, long axis horizontal.
-  ctx.restore();
   ctx.fillStyle = PALETTE.body;
   ctx.beginPath();
   // Smaller egg-shaped head, long axis horizontal ("real goose, not mascot").

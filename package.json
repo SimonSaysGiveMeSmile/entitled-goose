@@ -1,6 +1,6 @@
 {
   "name": "entitled-goose",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A desktop pet goose that acts like it owns your desktop. Original art & audio; not affiliated with House House, Panic, or samperson.",
   "main": "main/main.js",
   "type": "module",

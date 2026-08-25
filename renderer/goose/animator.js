@@ -4,16 +4,13 @@
 // additive breath/blink/tail layers.
 
 import { Gait } from '../../shared/gait.js';
-import { solveFabrik, blendToRest, limitBends, chainLengths } from '../../shared/fabrik.js';
+import { chainLengths } from '../../shared/fabrik.js';
 import { twoBoneIK } from '../../shared/legik.js';
 import { springDamp, clamp, lerp } from '../../shared/spring.js';
 import { evalTimeline, timelineDuration } from '../../shared/kf.js';
 import { GEO, neckRestPose } from './draw.js';
 
 const SPEEDS = { walk: 85, run: 210, charge: 330 }; // px/s
-// Per-joint neck bend limits (radians), base -> head: mobile at the base,
-// stiff near the skull so the head never hinges at a harsh angle.
-const NECK_BENDS = [0.75, 0.55, 0.30, 0.16];
 const ACCEL = 700;
 
 const TIMELINES = {
@@ -35,6 +32,23 @@ function clampNeckTarget(root, tx, ty) {
   const maxR = 0.47;
   if (d <= maxR) return { x: tx, y: ty };
   return { x: root.x + (dx / d) * maxR, y: root.y + (dy / d) * maxR };
+}
+
+// The landing-page neck, ported: fill `pts` with samples of a quadratic from
+// root to target whose control point carries an S-bias perpendicular to the
+// chord — one clean elastic curve at every reach angle.
+function quadNeck(pts, root, t) {
+  const cx = (root.x + t.x) / 2 - (t.y - root.y) * 0.13;
+  const cy = (root.y + t.y) / 2 + (t.x - root.x) * 0.10;
+  const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1);
+    const a = (1 - u) * (1 - u);
+    const b = 2 * u * (1 - u);
+    const c = u * u;
+    pts[i].x = a * root.x + b * cx + c * t.x;
+    pts[i].y = a * root.y + b * cy + c * t.y;
+  }
 }
 
 export class GooseAnimator {
@@ -363,15 +377,9 @@ export class GooseAnimator {
     const localT = clampNeckTarget(root,
       ((this.headWX - this.bodyX) / S) * this.facing,
       (this.headWY - this.bodyY) / S);
-    this.neckPts[0].x = root.x;
-    this.neckPts[0].y = root.y;
-    solveFabrik(this.neckPts, this.neckLengths, localT);
-    // Bend limits keep the chain kink-free at extreme reach angles so the
-    // ribbon never creases or visually detaches from body or head.
-    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.0, maxBend: NECK_BENDS });
-    // Higher idle stiffness keeps the relaxed back-swept rest pose dominant.
-    const stiffness = this.action ? 0.06 : this.sleepAmt > 0.5 ? 0.5 : 0.42;
-    blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, stiffness);
+    // Landing-page neck: one smooth elastic quadratic, S-biased — no joints,
+    // no kinks, stretches naturally with the reach.
+    quadNeck(this.neckPts, root, localT);
     this.sanitizeNeck(bodyDY);
 
     // ---- Legs (local space) ----
@@ -428,11 +436,7 @@ export class GooseAnimator {
     const localT = clampNeckTarget(root,
       ((this.headWX - this.bodyX) / S) * this.facing,
       (this.headWY - this.bodyY) / S);
-    this.neckPts[0].x = root.x;
-    this.neckPts[0].y = root.y;
-    solveFabrik(this.neckPts, this.neckLengths, localT);
-    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.0, maxBend: NECK_BENDS });
-    blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, 0.2);
+    quadNeck(this.neckPts, root, localT);
     this.sanitizeNeck(bodyDY);
 
     const tip = this.neckPts[this.neckPts.length - 1];
