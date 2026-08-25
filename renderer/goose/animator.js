@@ -340,12 +340,16 @@ export class GooseAnimator {
       // the neck keeps a curve, fine-grained retargeting (14px at default
       // scale — coarse thresholds make tracking notchy), and the site's
       // first-order integrator below instead of the second-order spring.
-      const r = clamp(d, 0.18 * S, 0.48 * S);
+      // Reach floor 0.30S keeps the drawn head outside the chest silhouette
+      // (verified against the body bezier; lower floors bury the head when
+      // the cursor hovers the goose). Near the root, direction is noise —
+      // hold the last look instead of whipping around the shoulder.
+      const r = clamp(d, 0.30 * S, 0.48 * S);
       let tx = root.x + (dx / d) * r;
       let ty = Math.min(root.y + (dy / d) * r, this.bodyY - 0.16 * S);
-      if (!this.lastLookTarget || Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 0.082 * S) {
-        this.lastLookTarget = { x: tx, y: ty };
-      }
+      const retarget = !this.lastLookTarget
+        || (d > 0.10 * S && Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 0.082 * S);
+      if (retarget) this.lastLookTarget = { x: tx, y: ty };
       this.headTX = this.lastLookTarget.x;
       this.headTY = this.lastLookTarget.y;
       this.lookElastic = true;
