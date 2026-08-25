@@ -387,40 +387,50 @@ export class Behavior {
           x: B.clampX(opts.x ?? B.cursor.x, 140),
           y: opts.y != null ? opts.y : B.workArea.y + B.workArea.height * 0.25,
         };
-        // Stand so the beak can reach the button: body below-right of it.
+        // Stand just right of the button so the extended beak lands ON it.
         const target = {
-          x: B.clampX(btn.x + 40, 140),
-          y: B.clampY(btn.y + 0.95 * A.S),
+          x: B.clampX(btn.x + 58, 130),
+          y: B.clampY(btn.y + 0.92 * A.S),
         };
         let phase = 'charge';
-        let honks = 0;
+        let warned = false;
         let cooldown = 0;
+        let peckT = null;
         let doneT = 1.6;
         return {
           name, update(dt) {
             if (phase === 'charge') {
-              if (!B.near(target, 18)) {
+              if (!B.near(target, 16)) {
                 B.intent.move = target;
                 B.intent.speedTier = 'charge';
                 return false;
               }
-              phase = 'honk';
+              phase = 'peck';
             }
-            if (phase === 'honk') {
+            if (phase === 'peck') {
               cooldown -= dt;
               B.intent.lookAt = btn;
-              if (!A.busy && cooldown <= 0) {
-                if (honks >= 2) {
-                  // The final "honk" is the peck ON the close button.
+              if (!warned && !A.busy && cooldown <= 0) {
+                // One warning honk at the button…
+                A.startAction('honk', { volume: Math.min(1, B.honkVolume() + 0.25), target: btn });
+                warned = true;
+                cooldown = 0.5;
+                return false;
+              }
+              if (warned && !A.busy && cooldown <= 0 && peckT === null) {
+                // …then the peck: neck extends to the button and the close
+                // fires at the exact moment of beak contact.
+                A.startAction('honk', { volume: 0.5, target: btn });
+                peckT = 0.2;
+              }
+              if (peckT !== null) {
+                peckT -= dt;
+                if (peckT <= 0) {
                   B.events.closeDistraction(opts.id);
                   B.meter = clamp(B.meter - 0.08, 0, 1); // enforcement is satisfying
                   B.events.speak(`closed your ${opts.label || 'distraction'}. you're welcome.`);
                   phase = 'gloat';
-                  return false;
                 }
-                A.startAction('honk', { volume: Math.min(1, B.honkVolume() + 0.25), target: btn });
-                honks++;
-                cooldown = 0.4;
               }
               return false;
             }

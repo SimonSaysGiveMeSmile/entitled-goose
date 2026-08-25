@@ -260,8 +260,9 @@ export class FocusWarden {
       );
       const [px, py] = pos.split(',').map((n) => parseInt(n, 10));
       if (Number.isFinite(px) && Number.isFinite(py)) {
-        targetX = px + 70;
-        targetY = py + 40;
+        // The red close button (traffic lights) — the visual "close" target.
+        targetX = px + 27;
+        targetY = py + 26;
       }
     } catch { /* fine: the goose will improvise */ }
 
