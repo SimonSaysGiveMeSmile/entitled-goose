@@ -2,77 +2,83 @@
 
 ![The goose, patrolling its territory](docs/demo.gif)
 
-A macOS desktop pet: a goose — faithful in style to *that* goose — that lives on your
-desktop as a transparent overlay and acts like it owns the place. It waddles along the
-bottom of your screen, honks at you, judges you silently, leaves passive-aggressive
-notes, and **closes your entertainment windows** (YouTube, Instagram, Netflix, …) to
-keep you focused.
+A desktop pet for macOS (Windows beta): a goose — faithful in style to *that* goose —
+that lives on your screen as a transparent overlay and acts like it owns the place.
+It roams the whole desktop, honks with intent, judges you silently, knows what time
+it is, and **closes your distracting tabs** (YouTube, Instagram, Amazon, …) by
+walking to the close button and pecking it.
 
-> **Legal note:** This project uses **original art and audio only** — the goose is
-> drawn entirely in code (flat-vector canvas paths) and the honk is synthesized with
-> Web Audio. No game assets are extracted or redistributed. Not affiliated with
-> House House, Panic, or samperson's Desktop Goose.
+**Download:** [entitled-goose.vercel.app](https://entitled-goose.vercel.app) ·
+[releases](https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases)
 
-## Run
-
-```bash
-npm install
-npm start        # the goose appears at the bottom of your primary display
-npm test         # rig math unit tests (gait, IK, keyframes)
-```
-
-The app has no dock icon — everything is controlled from the **🪿 menu-bar tray**:
-apologize to the goose, mute honks, polite (work-safe) mode, focus enforcement
-toggle, edit its note collection, or quit (the goose will remember this).
+> **Legal note:** Original art and audio only — the goose is drawn entirely in code
+> (flat-vector canvas) and the honk is synthesized with Web Audio. Not affiliated
+> with House House, Panic, or samperson's Desktop Goose. MIT licensed.
 
 ## What it does
 
-- **Waddles** with a procedural gait — feet pin to the ground (zero foot-slide),
-  weight-shift roll, and thrust-and-hold head stabilization like a real goose.
-- **Honks** — directed at your cursor, with white honk-lines and an original
-  formant-synthesized honk. Volume and frequency escalate with its mood.
-- **The Entitlement Meter** (Content → Miffed → Indignant → Wrath) rises while you
-  ignore it and falls when you acknowledge it. A wrathful goose runs, demands
-  attention next to your cursor, honks in triplets, and tracks muddy footprints.
-- **Judgmental stare** — walks over, faces the camera, and holds… with a "…" bubble.
-- **Passive-aggressive notes** — sticky-note windows delivered by beak
-  ("as per my last honk…"). Edit the collection via the tray → *Edit notes…*
-- **Focus enforcement** — polls the frontmost app/tab; when it spots a blocklisted
-  distraction the goose sprints over, honks the window down, and *then* the tab/app
-  closes. A note may follow: "closed your youtube. you're welcome."
-  Blocklist is user-editable (`~/Library/Application Support/entitled-goose/blocklist.json`).
-- **Interactions** — click the goose to poke it (it will not take that well);
-  press-and-hold ~1 second to pet it (appeasement). The cursor passes through
-  everything except the goose itself.
+- **Roams and waddles** anywhere on screen with a procedural gait (feet pin to the
+  ground, weight-shift roll) and an elastic one-curve neck that tracks your cursor
+  with saccadic bird-snaps.
+- **The Entitlement Meter** — content → miffed → indignant → wrath. Ignoring it
+  escalates honks, muddy footprints, judgmental stares, and speech-bubble
+  complaints ("as per my last honk…").
+- **Focus enforcement** — watches the frontmost tab/app; on a blocklisted site the
+  goose sprints to the tab's close button, honks twice, pecks, and the tab closes.
+  *"closed your youtube. you're welcome."* Blocklist is editable in the control panel.
+- **Environmental awareness** — greets you by time of day, judges 2am work sessions,
+  counts your absences to the minute, delivers battery warnings *at the battery
+  icon*, remarks on CPU strain and theme changes, and (optionally) reminds you of
+  calendar events. Each category has a toggle.
+- **Play** — click to poke (offends it), hold ~1s to pet (appeases it), drag to
+  carry it (it dangles, unimpressed; drop it from a height and it has words).
+  Switch desktops and it sprints after you — it never disappears, including over
+  fullscreen apps.
 - **Grudge memory** — quit via the tray and the next launch opens with
-  "I noticed you tried to evict me. bold."
+  *"I noticed you tried to evict me. bold."*
 
-## Permissions
+## Control panel
 
-- Cursor tracking, overlay, honks: **no permissions needed**.
-- Focus enforcement uses AppleScript, so macOS will prompt for **Automation**
-  permission (System Events + your browser) on first detection. If denied, the
-  goose delivers a note telling you to fix it.
+**Double-click the goose**, or use the 🪿 menu-bar icon → *Control panel…*
+Live mood meter · mute · polite (work-safe) mode · focus enforcement toggle ·
+footstep sounds · goose size · **energy** (restless ↔ sleepy) · max frame rate
+(30/60/120) · awareness toggles · **blocked websites & apps** · phrase editor ·
+an Apologize button.
+
+## Run from source
+
+```bash
+npm install
+npm start        # macOS; the goose appears immediately
+npm test         # rig-math unit tests
+npm run dist     # build installers (mac DMG + Windows NSIS)
+```
+
+## Permissions (macOS)
+
+- Overlay, honks, cursor tracking: **none needed**.
+- Focus enforcement & battery-icon targeting: **Automation** permission
+  (System Events + your browser) — macOS prompts on first use.
+- Calendar reminders (off by default): Calendar automation permission.
 
 ## Architecture
 
-- **Electron** transparent, frameless, always-on-top (`screen-saver` level),
-  click-through overlay. A small fixed-size window follows the goose in coarse
-  ≤30 Hz steps (never per-frame moves) — the macOS-safe overlay strategy.
-- **Original vector puppet**: ~12 code-drawn canvas paths skinned onto a procedural
-  rig — FABRIK neck (6 joints, rest-pose stiffness blending, tapered ribbon
-  extrusion), analytic 2-bone bird-knee leg IK, gait generator, keyframed honk
-  timeline, additive breath/blink/tail-spring layers.
+- **Electron** static full-work-area NSPanel overlay — transparent, click-through
+  except over the goose (with a failsafe), never moves, never steals focus.
+  Rendering is canvas-only at up to 120 fps with full-frame clears (~1% CPU).
+- **Original vector puppet**: code-drawn paths on a procedural rig — quadratic
+  elastic neck, analytic 2-bone bird-knee legs, gait generator, keyframed honk
+  timeline, additive breath/blink/tail layers. Palette and proportions per the
+  research brief in `docs/DESIGN.md`.
 - **Behavior**: weighted shuffle-deck task picker modulated by the Entitlement
-  Meter; distraction enforcement preempts everything.
-- See `docs/DESIGN.md` for the full research-derived design brief.
-
-## Project layout
+  Meter, energy setting, time of day, and your presence; enforcement and
+  environmental events preempt.
 
 ```
-main/       Electron main process: overlay window, tray, notes, FocusWarden
-renderer/   canvas goose: draw (vector paths), animator (rig), behavior, audio, vfx
-shared/     pure rig math (gait, FABRIK, leg IK, keyframes) — unit-tested
-test/       node --test suites for the rig math
-docs/       DESIGN.md — synthesized research brief
+main/       Electron main: overlay window, tray, control panel, FocusWarden,
+            EnvMonitor, CalendarWatcher, settings/blocklist storage
+renderer/   canvas goose: draw, animator, behavior, bubble, audio (synth), vfx
+shared/     pure rig math (gait, IK, keyframes) — unit-tested
+site/       landing page (entitled-goose.vercel.app)
+docs/       DESIGN.md research brief · demo.gif
 ```
