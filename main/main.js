@@ -30,11 +30,11 @@ function workArea() {
 
 function applyOverlayFlags() {
   if (!win || win.isDestroyed()) return;
-  // fullScreenable must be false BEFORE the workspace call, or macOS hides the
-  // overlay when the focused app is in native fullscreen.
+  // Order matters on macOS: fullScreenable(false) BEFORE the workspace call
+  // (or fullscreen apps hide the overlay), and always-on-top LAST (#36364).
   win.setFullScreenable(false);
-  win.setAlwaysOnTop(true, settings.polite ? 'floating' : 'screen-saver');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  win.setAlwaysOnTop(true, settings.polite ? 'floating' : 'screen-saver');
   win.setIgnoreMouseEvents(true, { forward: true });
   if (!win.isVisible()) win.showInactive();
 }
@@ -54,6 +54,9 @@ function createWindow() {
     y: wa.y,
     width: wa.width,
     height: wa.height,
+    // NSPanel: macOS can pin a regular borderless screen-sized window to one
+    // Space; panels reliably join every Space (incl. fullscreen) instead.
+    ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
     transparent: true,
     frame: false,
     hasShadow: false,
