@@ -25,11 +25,11 @@ const HONK_SOUND_T = 0.18;
 // Keep the neck target within (slightly under) chain reach so the solver
 // never fully straightens the neck into a pole, and never sees a wild target.
 function clampNeckTarget(root, tx, ty) {
-  if (!Number.isFinite(tx + ty)) return { x: root.x, y: root.y - 0.4 };
+  if (!Number.isFinite(tx + ty)) return { x: root.x, y: root.y - 0.33 };
   const dx = tx - root.x;
   const dy = ty - root.y;
   const d = Math.hypot(dx, dy);
-  const maxR = 0.38; // 20% shorter neck overall
+  const maxR = 0.33; // shorter, site-matched neck
   if (d <= maxR) return { x: tx, y: ty };
   return { x: root.x + (dx / d) * maxR, y: root.y + (dy / d) * maxR };
 }
@@ -306,7 +306,7 @@ export class GooseAnimator {
       const dx = tgt.x - restX;
       const dy = tgt.y - restY;
       const d = Math.hypot(dx, dy) || 1;
-      const reach = 0.24 * S;
+      const reach = 0.21 * S;
       this.headTX = restX - this.facing * 0.07 * S * squash + (dx / d) * reach * extend;
       this.headTY = restY + (dy / d) * reach * extend * 0.7;
       snapHalflife = 0.035;
@@ -344,7 +344,7 @@ export class GooseAnimator {
       // (verified against the body bezier; lower floors bury the head when
       // the cursor hovers the goose). Near the root, direction is noise —
       // hold the last look instead of whipping around the shoulder.
-      const r = clamp(d, 0.30 * S, 0.48 * S);
+      const r = clamp(d, 0.30 * S, 0.42 * S);
       let tx = root.x + (dx / d) * r;
       let ty = Math.min(root.y + (dy / d) * r, this.bodyY - 0.16 * S);
       const retarget = !this.lastLookTarget

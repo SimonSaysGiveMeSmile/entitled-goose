@@ -18,13 +18,13 @@ export const GEO = {
   neckRoot: { x: 0.165, y: -0.40 },
   neckSegments: 5,
   neckLength: 0.52,
-  headRx: 0.075,
-  headRy: 0.062,
+  headRx: 0.088,
+  headRy: 0.071,
   hipNear: { x: 0.015, y: -0.175 },
   hipFar: { x: -0.035, y: -0.185 },
   legUpper: 0.105,
   legLower: 0.105,
-  restHead: { x: 0.13, y: -0.78 },
+  restHead: { x: 0.135, y: -0.73 },
 };
 
 // Authored neck rest pose: an upright S that settles slightly BACKWARD over
@@ -35,11 +35,11 @@ export function neckRestPose(bodyDY = 0) {
   // short and stiff at the skull.
   const pts = [
     { x: r.x, y: r.y },
-    { x: r.x + 0.014, y: r.y - 0.092 },
-    { x: r.x + 0.002, y: r.y - 0.180 },
-    { x: r.x - 0.010, y: r.y - 0.260 },
-    { x: r.x + 0.003, y: r.y - 0.328 },
-    { x: r.x + 0.018, y: r.y - 0.364 },
+    { x: r.x + 0.012, y: r.y - 0.080 },
+    { x: r.x + 0.002, y: r.y - 0.157 },
+    { x: r.x - 0.009, y: r.y - 0.226 },
+    { x: r.x + 0.003, y: r.y - 0.285 },
+    { x: r.x + 0.016, y: r.y - 0.317 },
   ];
   for (const p of pts) p.y += bodyDY;
   return pts;
@@ -119,7 +119,7 @@ function drawNeck(ctx, pts, color) {
     const len = Math.hypot(tx, ty) || 1;
     tx /= len; ty /= len;
     const u = i / (n - 1);
-    const hw = (0.072 - 0.018 * u) * 0.5; // taper base → head
+    const hw = (0.092 - 0.008 * u) * 0.5; // near-constant, site-thick (16px @ 220-unit goose)
     left.push({ x: p.x - ty * hw, y: p.y + tx * hw });
     right.push({ x: p.x + ty * hw, y: p.y - tx * hw });
   }
@@ -134,7 +134,7 @@ function drawNeck(ctx, pts, color) {
   // Round cap at the tip, bridging into the head.
   const tip = samples[n - 1];
   ctx.beginPath();
-  ctx.arc(tip.x, tip.y, 0.030, 0, Math.PI * 2);
+  ctx.arc(tip.x, tip.y, 0.042, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -167,7 +167,7 @@ function drawHead(ctx, head, opts) {
   ctx.translate(head.x, head.y);
   ctx.rotate(angle);
 
-  const beakLen = 0.125 * (1 - 0.40 * faceCamera);
+  const beakLen = 0.147 * (1 - 0.40 * faceCamera);
   const bx = 0.040; // beak hinge x relative to head center (shared pivot)
   const upperRot = -beakOpen * 0.30;
   const lowerRot = beakOpen * 0.40;
@@ -222,14 +222,14 @@ function drawHead(ctx, head, opts) {
 
   // Eye(s): tiny dot, high and forward, no highlight — all expressiveness
   // lives in the pose, none in the face.
-  const eyeY = -0.022;
+  const eyeY = -0.025;
   const drawEye = (ex) => {
     ctx.fillStyle = PALETTE.eye;
     if (eyelid > 0.6) {
       ctx.fillRect(ex - 0.008, eyeY - 0.001, 0.016, 0.003); // flat closed-eye line
     } else {
       ctx.beginPath();
-      ctx.arc(ex, eyeY, 0.0085, 0, Math.PI * 2);
+      ctx.arc(ex, eyeY, 0.010, 0, Math.PI * 2);
       ctx.fill();
     }
   };
