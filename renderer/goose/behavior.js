@@ -200,8 +200,12 @@ export class Behavior {
   onWorkAreaChange(wa) {
     this.workArea = wa;
     this._batteryIcon = null; // the menu bar moved with the display
-    if (this.task && this.task.name !== 'catchup') {
-      this.task = null; // its target lives on the old display
+    // Cancel EVERY task, catchup included: any in-flight target lives on the
+    // old display and can never be reached inside the new work area. A
+    // display-follow move sends a forced space-changed right after this,
+    // which starts a fresh catchup with a valid target.
+    if (this.task) {
+      this.task = null;
       this.resetIntent();
       this.gapT = 1.0;
     }
@@ -397,10 +401,13 @@ export class Behavior {
   // Space switch: the goose sprints in AFTER YOU — it drops back away from
   // your cursor and charges toward it, so the chase direction always reads
   // correctly no matter which way you swiped. Throttled against rapid swipes.
-  onSpaceChange() {
+  onSpaceChange(force = false) {
     if (this.anim.dragging) return;
     const now = performance.now() / 1000;
-    if (this._lastSpaceT && now - this._lastSpaceT < 3) return;
+    // The throttle guards against rapid Space swipes; display-follow moves
+    // bypass it (force) — their catchup was just cancelled by the
+    // accompanying work-area change and must be replaced.
+    if (!force && this._lastSpaceT && now - this._lastSpaceT < 3) return;
     this._lastSpaceT = now;
 
     const A = this.anim;

@@ -202,7 +202,10 @@ app.whenReady().then(() => {
         applyOverlayFlags();
         sendToGoose('work-area', cursorDisplay.workArea);
         sendToGoose('window-moved', win.getBounds());
-        sendToGoose('space-changed', {}); // cue the catch-up sprint
+        // follow:true bypasses the swipe throttle — a display move MUST
+        // retarget the catchup or a stale-display target sprints the goose
+        // into the screen edge forever.
+        sendToGoose('space-changed', { follow: true });
       }
     } else {
       otherDisplayPolls = 0;

@@ -97,10 +97,13 @@ function drawFoot(ctx, ankle, droop, color) {
 // head — no visible seams at any reach angle.
 function drawNeck(ctx, pts, color) {
   const first = pts[0];
-  const second = pts[1];
-  const dl = Math.hypot(second.x - first.x, second.y - first.y) || 1;
+  // The phantom root anchors INTO the body interior (down-back of the neck
+  // root) rather than opposite the first segment: on a downward look the
+  // segment-opposite phantom pointed UP and poked a stub past the shoulder
+  // silhouette. A fixed interior anchor stays buried at every reach angle
+  // and gives the base a consistent anatomical emergence direction.
   const rooted = [
-    { x: first.x - ((second.x - first.x) / dl) * 0.09, y: first.y - ((second.y - first.y) / dl) * 0.09 },
+    { x: first.x - 0.07, y: first.y + 0.05 },
     ...pts,
   ];
   const samples = sampleCatmullRom(rooted, 20);

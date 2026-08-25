@@ -133,7 +133,7 @@ window.goose.on('speak', ({ text }) => {
   if (bubble && !(behavior && behavior.shushed)) bubble.say(text);
 });
 
-window.goose.on('space-changed', () => behavior && behavior.onSpaceChange());
+window.goose.on('space-changed', (d) => behavior && behavior.onSpaceChange(!!(d && d.follow)));
 
 let pendingEnv = null;
 window.goose.on('env', (env) => {
