@@ -31,13 +31,15 @@ export const GEO = {
 // the body (how a relaxed goose actually carries it), head barely leading.
 export function neckRestPose(bodyDY = 0) {
   const r = GEO.neckRoot;
+  // Segment lengths taper toward the head: long and mobile at the base,
+  // short and stiff at the skull.
   const pts = [
     { x: r.x, y: r.y },
-    { x: r.x + 0.018, y: r.y - 0.10 },
-    { x: r.x + 0.002, y: r.y - 0.21 },
-    { x: r.x - 0.012, y: r.y - 0.315 },
-    { x: r.x + 0.004, y: r.y - 0.415 },
-    { x: r.x + 0.028, y: r.y - 0.468 },
+    { x: r.x + 0.018, y: r.y - 0.115 },
+    { x: r.x + 0.002, y: r.y - 0.225 },
+    { x: r.x - 0.012, y: r.y - 0.325 },
+    { x: r.x + 0.004, y: r.y - 0.410 },
+    { x: r.x + 0.022, y: r.y - 0.455 },
   ];
   for (const p of pts) p.y += bodyDY;
   return pts;

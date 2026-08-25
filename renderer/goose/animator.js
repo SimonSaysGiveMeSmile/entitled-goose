@@ -13,7 +13,7 @@ import { GEO, neckRestPose } from './draw.js';
 const SPEEDS = { walk: 85, run: 210, charge: 330 }; // px/s
 // Per-joint neck bend limits (radians), base -> head: mobile at the base,
 // stiff near the skull so the head never hinges at a harsh angle.
-const NECK_BENDS = [0.75, 0.55, 0.40, 0.26];
+const NECK_BENDS = [0.75, 0.55, 0.30, 0.16];
 const ACCEL = 700;
 
 const TIMELINES = {
@@ -120,14 +120,18 @@ export class GooseAnimator {
     return this.action !== null;
   }
 
+  // DRAWN head position (bend-limited chain tip), not the raw spring target —
+  // bubbles, honk lines, and the beak must anchor to where the head really is.
   headWorld() {
+    if (this.headDrawWX != null) return { x: this.headDrawWX, y: this.headDrawWY };
     return { x: this.headWX, y: this.headWY };
   }
 
   beakWorld() {
+    const h = this.headWorld();
     return {
-      x: this.headWX + this.facing * (GEO.headRx + 0.09) * this.S,
-      y: this.headWY,
+      x: h.x + this.facing * (GEO.headRx + 0.09) * this.S,
+      y: h.y,
     };
   }
 
@@ -297,10 +301,13 @@ export class GooseAnimator {
       let dx = intent.lookAt.x - root.x;
       let dy = intent.lookAt.y - root.y;
       const d = Math.hypot(dx, dy) || 1;
-      const r = clamp(d, 0.30 * S, 0.55 * S);
+      // Cap short of full chain reach so the neck always keeps some curve
+      // instead of straightening into a stiff pole.
+      const r = clamp(d, 0.30 * S, 0.48 * S);
       let tx = root.x + (dx / d) * r;
       let ty = Math.min(root.y + (dy / d) * r, this.bodyY - 0.16 * S);
       if (!this.lastLookTarget || Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 34) {
+        // (retarget threshold keeps tracking saccadic, not smooth)
         this.lastLookTarget = { x: tx, y: ty };
       }
       this.headTX = this.lastLookTarget.x;
@@ -365,6 +372,8 @@ export class GooseAnimator {
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
     const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.35, -0.55, 0.55);
+    this.headDrawWX = this.bodyX + (tip.x + ux * 0.034) * S * this.facing;
+    this.headDrawWY = this.bodyY + (tip.y + uy * 0.034) * S;
 
     return {
       bodyX: this.bodyX,
@@ -416,6 +425,9 @@ export class GooseAnimator {
     let uy = tip.y - prev.y;
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
+
+    this.headDrawWX = this.bodyX + (tip.x + ux * 0.034) * S * this.facing;
+    this.headDrawWY = this.bodyY + (tip.y + uy * 0.034) * S;
 
     // Dangling legs: feet hang below the hips with a velocity sway.
     const sway = clamp(-this.vx * 0.0004, -0.08, 0.08);

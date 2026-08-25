@@ -248,11 +248,15 @@ function step(dt) {
 }
 
 function contentRect(state) {
+  // Conservative bounds: dangling feet during drags reach below the foot
+  // line, and the beak at full honk extension reaches past the body span —
+  // anything drawn outside this rect would linger as residue pixels.
   const S = settings.scale;
-  let x0 = state.bodyX - 0.85 * S;
-  let x1 = state.bodyX + 0.85 * S;
-  let y0 = state.bodyY - 1.25 * S;
-  let y1 = state.bodyY + 12;
+  const head = animator.headWorld();
+  let x0 = Math.min(state.bodyX - 1.1 * S, head.x - 0.4 * S);
+  let x1 = Math.max(state.bodyX + 1.1 * S, head.x + 0.4 * S);
+  let y0 = Math.min(state.bodyY - 1.35 * S, head.y - 0.35 * S);
+  let y1 = state.bodyY + 0.3 * S;
   for (const f of vfx.footprints) {
     x0 = Math.min(x0, f.x - 26); x1 = Math.max(x1, f.x + 26);
     y0 = Math.min(y0, f.y - 16); y1 = Math.max(y1, f.y + 10);
