@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell, nativeImage, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell, nativeImage, dialog, systemPreferences } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSettings, saveSettings, loadNotes, saveNotes, notesPath } from './settings.js';
@@ -175,6 +175,22 @@ app.whenReady().then(() => {
     // Renderer re-follows on its next frame once it has the new bounds.
     sendToGoose('work-area', workArea());
   };
+
+  // Space switches: re-assert overlay flags (macOS can drop the on-top level)
+  // and cue the goose's catch-up sprint so it "follows" you to the new desktop.
+  if (process.platform === 'darwin') {
+    try {
+      systemPreferences.subscribeWorkspaceNotification(
+        'NSWorkspaceActiveSpaceDidChangeNotification',
+        () => {
+          applyOverlayFlags();
+          sendToGoose('space-changed', {});
+        }
+      );
+    } catch (err) {
+      console.error('space-change subscription failed', err);
+    }
+  }
   screen.on('display-added', onDisplayChange);
   screen.on('display-removed', onDisplayChange);
   screen.on('display-metrics-changed', onDisplayChange);

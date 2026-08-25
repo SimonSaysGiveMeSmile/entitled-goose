@@ -104,6 +104,8 @@ window.goose.on('distraction', (d) => behavior && behavior.enforce(d));
 
 window.goose.on('speak', ({ text }) => bubble && bubble.say(text));
 
+window.goose.on('space-changed', () => behavior && behavior.onSpaceChange());
+
 let lastCursor = null;
 let lastCursorTime = 0;
 window.goose.on('cursor', (p) => {

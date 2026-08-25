@@ -107,6 +107,29 @@ export class Behavior {
     this.gapT = 1.8;
   }
 
+  // Space switch: stage the illusion that the goose sprinted after you onto
+  // the new desktop — snap it back toward the nearer screen edge, then charge
+  // home. Throttled so rapid swipes don't stack sprints.
+  onSpaceChange() {
+    if (this.anim.dragging) return;
+    const now = performance.now() / 1000;
+    if (this._lastSpaceT && now - this._lastSpaceT < 3) return;
+    this._lastSpaceT = now;
+
+    const A = this.anim;
+    const wa = this.workArea;
+    const homeX = A.bodyX;
+    const homeY = A.bodyY;
+    const dir = homeX < wa.x + wa.width / 2 ? -1 : 1; // lag toward nearer edge
+    A.bodyX = clamp(homeX + dir * 420, wa.x + 0.45 * A.S, wa.x + wa.width - 0.45 * A.S);
+    A.vx = 0;
+    A.vy = 0;
+    A.facing = Math.sign(homeX - A.bodyX) || A.facing;
+    A.gait.reset(A.bodyX / A.S, A.facing);
+    this.task = this.makeTask('catchup', { x: homeX, y: homeY });
+    this.gapT = 0;
+  }
+
   onApologize() {
     this.meter = 0;
     setTimeout(() => this.events.speak('I forgive you. (for what you did.)'), 2500);
@@ -378,6 +401,28 @@ export class Behavior {
             t += dt;
             B.intent.lookAt = B.cursor;
             return t > 2.5;
+          },
+        };
+      },
+      catchup() {
+        // Sprint back to where it was standing before the desktop switched.
+        const target = { x: opts.x, y: opts.y };
+        let arrived = false;
+        let settleT = 0.6;
+        return {
+          name, update(dt) {
+            if (!arrived) {
+              if (!B.near(target, 16)) {
+                B.intent.move = target;
+                B.intent.speedTier = 'run';
+                return false;
+              }
+              arrived = true;
+              if (Math.random() < 0.25) B.events.speak('nice try.');
+            }
+            settleT -= dt;
+            B.intent.lookAt = B.cursor;
+            return settleT <= 0;
           },
         };
       },
