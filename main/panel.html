@@ -3,38 +3,43 @@
 <head>
 <meta charset="utf-8" />
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    --green: #1e3a29;
+    --green-deep: #16291d;
+    --cream: #f3efe2;
+    --cream-dim: rgba(243, 239, 226, 0.55);
+    --orange: #f58731;
+    --rule: rgba(243, 239, 226, 0.14);
+  }
   body {
     margin: 0;
-    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-    font-size: 13px;
-    background: #20242b;
-    color: #e8e8e8;
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    background: var(--green);
+    color: var(--cream);
     user-select: none;
   }
-  .wrap { padding: 18px 20px 20px; }
-  h1 { font-size: 16px; margin: 0 0 2px; }
-  .sub { color: #9aa0ab; margin-bottom: 16px; font-size: 12px; }
+  .wrap { padding: 20px 22px 22px; }
+  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: 0.04em; }
+  .sub { color: var(--cream-dim); margin-bottom: 16px; font-size: 11px; font-style: italic; }
 
   .meter-card {
-    background: #2a2f38;
-    border-radius: 10px;
+    background: var(--green-deep);
+    border: 1px solid var(--rule);
     padding: 12px 14px;
     margin-bottom: 16px;
   }
-  .meter-label { display: flex; justify-content: space-between; margin-bottom: 8px; }
-  #tier { font-weight: 600; }
+  .meter-label { display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.1em; font-size: 11px; }
+  #tier { font-weight: 600; color: var(--orange); }
   .bar {
-    height: 10px;
-    background: #1a1d22;
-    border-radius: 5px;
+    height: 9px;
+    background: rgba(0, 0, 0, 0.35);
     overflow: hidden;
   }
   #fill {
     height: 100%;
     width: 15%;
-    border-radius: 5px;
-    background: linear-gradient(90deg, #6fbf73, #e8c34a 55%, #e2543b);
+    background: linear-gradient(90deg, #7fae74, #e8c34a 55%, var(--orange));
     background-size: 340px 100%;
     transition: width 0.4s;
   }
@@ -44,40 +49,50 @@
     align-items: center;
     justify-content: space-between;
     padding: 9px 2px;
-    border-bottom: 1px solid #2c313a;
+    border-bottom: 1px solid var(--rule);
   }
   .row label { flex: 1; }
-  .hint { color: #8a919d; font-size: 11px; margin-top: 2px; }
-  input[type="range"] { width: 130px; }
+  .hint { color: var(--cream-dim); font-size: 10.5px; margin-top: 2px; }
+  input[type="range"] { width: 130px; accent-color: var(--orange); }
+  input[type="checkbox"] { accent-color: var(--orange); }
+  select {
+    background: var(--green-deep);
+    color: var(--cream);
+    border: 1px solid var(--rule);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 3px 6px;
+  }
 
   textarea {
     width: 100%;
     box-sizing: border-box;
     height: 108px;
     margin-top: 8px;
-    background: #1a1d22;
-    color: #ddd;
-    border: 1px solid #333a45;
-    border-radius: 8px;
+    background: var(--green-deep);
+    color: var(--cream);
+    border: 1px solid var(--rule);
     padding: 8px;
-    font: 12px/1.45 ui-monospace, monospace;
+    font: 11.5px/1.5 "Spline Sans Mono", ui-monospace, monospace;
     resize: none;
   }
   .btns { display: flex; gap: 8px; margin-top: 14px; }
   button {
     flex: 1;
-    padding: 8px 10px;
-    border: 0;
-    border-radius: 8px;
-    background: #3a4150;
-    color: #eee;
-    font-size: 13px;
+    padding: 9px 10px;
+    border: 1.5px solid var(--orange);
+    background: var(--orange);
+    color: var(--green-deep);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     cursor: pointer;
+    transition: background 0.15s, color 0.15s;
   }
-  button:hover { background: #454d5f; }
-  #apologize { background: #4f6b52; }
-  #apologize:hover { background: #5a7a5e; }
-  .saved { color: #6fbf73; font-size: 11px; opacity: 0; transition: opacity 0.3s; }
+  button:hover { background: var(--cream); border-color: var(--cream); }
+  .saved { color: #9fce8f; font-size: 11px; opacity: 0; transition: opacity 0.3s; }
 </style>
 </head>
 <body>

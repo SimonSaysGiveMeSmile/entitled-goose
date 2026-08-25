@@ -3,361 +3,536 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Entitled Goose — a desktop pet that owns your desktop</title>
-<meta name="description" content="A goose for your desktop. It honks, judges you silently, and closes your YouTube tabs. You may continue using your computer. For now." />
-<meta property="og:title" content="Entitled Goose" />
-<meta property="og:description" content="A desktop pet that owns your desktop. Honks included." />
+<title>Entitled Goose — this desktop is occupied</title>
+<meta name="description" content="A desktop pet goose that honks, judges you, closes your YouTube tabs, and files complaints. Official notice: it lives here now." />
+<meta property="og:title" content="Entitled Goose — Notice of Occupancy" />
+<meta property="og:description" content="A desktop goose that owns your desktop. Effective immediately." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..900,100,1&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --paper: #f4f1e8;
-    --ink: #272725;
+    --green: #1e3a29;
+    --green-deep: #162d1f;
+    --cream: #f3efe2;
+    --cream-dim: #e4dfcd;
     --goose: #ececec;
-    --goose-shade: #dadada;
     --orange: #f58731;
-    --lawn: #45785f;
-    --rule: #d8d3c4;
+    --orange-deep: #d96f1e;
+    --ink: #1a2019;
+    --rule: rgba(243, 239, 226, 0.16);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
-    background: var(--paper);
-    color: var(--ink);
-    font-family: "Fraunces", serif;
+    background:
+      radial-gradient(1200px 700px at 78% -10%, rgba(245, 135, 49, 0.09), transparent 60%),
+      radial-gradient(900px 600px at -10% 108%, rgba(0, 0, 0, 0.35), transparent 55%),
+      var(--green);
+    color: var(--cream);
+    font-family: "Spline Sans Mono", monospace;
     overflow-x: hidden;
   }
-  ::selection { background: var(--orange); color: var(--paper); }
+  ::selection { background: var(--orange); color: var(--green-deep); }
+  .serif { font-family: "Instrument Serif", serif; font-weight: 400; }
 
-  .mono {
-    font-family: "Azeret Mono", monospace;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  /* grain */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index: 50;
   }
 
   header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 22px 32px;
-    border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+    padding: 26px 40px 0;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
   }
-  header a { color: var(--ink); text-decoration: none; }
-  header a:hover { color: var(--orange); }
+  header a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--rule); padding-bottom: 2px; }
+  header a:hover { color: var(--orange); border-color: var(--orange); }
 
+  /* ---------- HERO ---------- */
   .hero {
-    max-width: 1060px;
-    margin: 0 auto;
-    padding: 88px 32px 40px;
+    position: relative;
+    min-height: 92vh;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    padding: 0 40px;
+    cursor: crosshair;
   }
-  .kicker {
-    color: var(--lawn);
-    margin-bottom: 22px;
-    animation: rise 0.7s 0.05s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  .hero-copy {
+    align-self: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding-top: 40px;
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .file-line {
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 26px;
+    animation: rise 0.8s 0.1s cubic-bezier(0.2, 0.9, 0.2, 1) both;
   }
   h1 {
-    font-size: clamp(56px, 11vw, 148px);
-    line-height: 0.92;
-    margin: 0 0 30px;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    font-variation-settings: "SOFT" 100, "WONK" 1;
-    animation: rise 0.7s 0.15s cubic-bezier(0.2, 0.9, 0.2, 1) both;
-  }
-  h1 .honkable {
-    color: var(--orange);
-    cursor: pointer;
-    display: inline-block;
-    transition: transform 0.12s;
-  }
-  h1 .honkable:hover { transform: rotate(-2deg) scale(1.02); }
-  h1 .honkable:active { transform: scale(0.97); }
-  .sub {
-    font-size: clamp(18px, 2.4vw, 24px);
-    max-width: 30em;
-    line-height: 1.45;
-    margin: 0 0 40px;
+    font-family: "Instrument Serif", serif;
     font-weight: 400;
-    animation: rise 0.7s 0.25s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    font-size: clamp(54px, 9.5vw, 138px);
+    line-height: 0.98;
+    margin: 0;
+    letter-spacing: -0.015em;
+    color: var(--cream);
+    animation: rise 0.8s 0.22s cubic-bezier(0.2, 0.9, 0.2, 1) both;
   }
-  .sub em { color: var(--lawn); }
-
-  .cta-row {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    align-items: center;
-    animation: rise 0.7s 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  h1 em { font-style: italic; color: var(--orange); }
+  .hero-sub {
+    margin: 30px 0 0;
+    max-width: 34em;
+    font-size: 14.5px;
+    line-height: 1.75;
+    color: var(--cream-dim);
+    animation: rise 0.8s 0.34s cubic-bezier(0.2, 0.9, 0.2, 1) both;
   }
-  .btn {
-    font-family: "Azeret Mono", monospace;
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    text-decoration: none;
-    padding: 15px 26px;
-    border-radius: 999px;
-    border: 1.5px solid var(--ink);
-    color: var(--ink);
-    transition: transform 0.15s, background 0.15s, color 0.15s;
-    display: inline-block;
-  }
-  .btn:hover { transform: translateY(-2px); }
-  .btn.primary { background: var(--ink); color: var(--paper); }
-  .btn.primary:hover { background: var(--orange); border-color: var(--orange); }
-  .btn.honk { border-color: var(--orange); color: var(--orange); }
-  .btn.honk:active { transform: scale(0.96); }
-
-  @keyframes rise {
-    from { opacity: 0; transform: translateY(22px); }
-    to { opacity: 1; transform: none; }
-  }
-
-  /* ---- the goose ---- */
-  .pond {
-    position: relative;
-    height: 210px;
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-    overflow: hidden;
-    background:
-      repeating-linear-gradient(90deg, transparent 0 120px, rgba(69, 120, 95, 0.05) 120px 121px);
-  }
-  .walker {
+  .hero-hint {
     position: absolute;
-    bottom: 14px;
-    left: -160px;
-    animation: cross 26s linear infinite;
+    right: 0;
+    bottom: -10px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(243,239,226,0.4);
+    animation: rise 0.8s 0.6s both;
   }
-  .walker svg { display: block; animation: waddle 0.55s ease-in-out infinite; transform-origin: 50% 88%; }
-  @keyframes cross {
-    from { transform: translateX(0); }
-    to { transform: translateX(calc(100vw + 340px)); }
-  }
-  @keyframes waddle {
-    0%, 100% { transform: rotate(2.4deg) translateY(0); }
-    50% { transform: rotate(-2.4deg) translateY(-2.5px); }
-  }
-  .foot-a { animation: stepA 0.55s ease-in-out infinite; transform-origin: top; }
-  .foot-b { animation: stepB 0.55s ease-in-out infinite; transform-origin: top; }
-  @keyframes stepA { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
-  @keyframes stepB { 0%,100% { transform: translateY(-7px) } 50% { transform: translateY(0) } }
-  .blink { animation: blink 5.2s infinite; }
-  @keyframes blink { 0%, 96%, 100% { transform: scaleY(1) } 97.5% { transform: scaleY(0.1) } }
+  @keyframes rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
 
+  /* goose stage */
+  .stage {
+    position: relative;
+    height: 320px;
+    border-bottom: 1px solid var(--rule);
+  }
+  #gooseSvg {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-62%);
+    overflow: visible;
+  }
   .honk-burst {
     position: fixed;
     pointer-events: none;
-    font-family: "Azeret Mono", monospace;
-    font-weight: 500;
+    font-family: "Spline Sans Mono", monospace;
+    font-weight: 600;
     color: var(--orange);
-    animation: burst 0.7s ease-out forwards;
-    z-index: 99;
+    z-index: 60;
+    animation: burst 0.75s ease-out forwards;
   }
   @keyframes burst {
     from { opacity: 1; transform: translate(-50%, -50%) scale(0.6) rotate(var(--r)); }
-    to { opacity: 0; transform: translate(-50%, -140%) scale(1.35) rotate(var(--r)); }
+    to { opacity: 0; transform: translate(-50%, -150%) scale(1.4) rotate(var(--r)); }
   }
 
-  /* ---- manifesto ---- */
-  .manifesto {
-    max-width: 1060px;
-    margin: 0 auto;
-    padding: 72px 32px;
+  /* marquee */
+  .marquee {
+    border-bottom: 1px solid var(--rule);
+    overflow: hidden;
+    padding: 13px 0;
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(243, 239, 226, 0.5);
+    white-space: nowrap;
+  }
+  .marquee span { display: inline-block; animation: slide 28s linear infinite; }
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ---------- NOTICE ---------- */
+  .notice-wrap {
+    max-width: 880px;
+    margin: 110px auto;
+    padding: 0 40px;
+    position: relative;
+  }
+  .notice {
+    background: var(--cream);
+    color: var(--ink);
+    padding: 58px 62px 54px;
+    border: 1.5px solid var(--ink);
+    box-shadow: 14px 14px 0 rgba(0, 0, 0, 0.35);
+    transform: rotate(-0.5deg);
+    position: relative;
+  }
+  .notice .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .notice h2 {
+    font-family: "Instrument Serif", serif;
+    font-weight: 400;
+    font-size: clamp(34px, 5vw, 54px);
+    margin: 26px 0 6px;
+    line-height: 1.05;
+  }
+  .notice h2 em { font-style: italic; }
+  .notice .effective { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #6d6753; margin-bottom: 34px; }
+  .bylaw {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 0;
+    grid-template-columns: 64px 1fr;
+    gap: 18px;
+    padding: 20px 0;
+    border-top: 1px solid #cfc9b4;
   }
-  .rule-item {
-    border-left: 1px solid var(--rule);
-    padding: 6px 26px 10px;
+  .bylaw .num {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-size: 30px;
+    color: var(--orange-deep);
+    line-height: 1;
   }
-  .rule-item:first-child { border-left: 0; padding-left: 0; }
-  .rule-item .num { color: var(--orange); margin-bottom: 14px; }
-  .rule-item h3 { font-size: 21px; margin: 0 0 8px; font-weight: 600; }
-  .rule-item p { margin: 0; line-height: 1.5; font-size: 15.5px; color: #55534d; }
+  .bylaw h3 { margin: 0 0 7px; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .bylaw p { margin: 0; font-size: 13.5px; line-height: 1.7; color: #4c4738; }
+  .stamp {
+    position: absolute;
+    right: 34px;
+    top: -30px;
+    width: 132px;
+    height: 132px;
+    border: 3px solid var(--orange-deep);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: var(--orange-deep);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1.5;
+    transform: rotate(12deg);
+    background: rgba(243, 239, 226, 0.9);
+    transition: transform 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
+  }
+  .notice:hover .stamp { transform: rotate(4deg) scale(1.05); }
 
-  /* ---- demo ---- */
-  .demo {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 0 32px 90px;
+  /* ---------- DOWNLOADS ---------- */
+  .dl {
+    max-width: 880px;
+    margin: 0 auto 110px;
+    padding: 0 40px;
     text-align: center;
   }
-  .demo .frame {
-    border: 1.5px solid var(--ink);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 10px 10px 0 rgba(69, 120, 95, 0.16);
+  .dl .lead {
+    font-family: "Instrument Serif", serif;
+    font-size: clamp(26px, 3.6vw, 40px);
+    margin-bottom: 34px;
   }
-  .demo img { display: block; width: 100%; }
-  .demo figcaption { margin-top: 14px; color: #706e66; font-size: 14px; font-style: italic; }
+  .dl .lead em { font-style: italic; color: var(--orange); }
+  .btn-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    font-family: "Spline Sans Mono", monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 17px 30px;
+    border: 1.5px solid var(--cream);
+    color: var(--cream);
+    transition: transform 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 rgba(0,0,0,0.4); }
+  .btn.primary { background: var(--orange); border-color: var(--orange); color: var(--green-deep); }
+  .btn.primary:hover { background: var(--cream); border-color: var(--cream); }
+  .dl .alt { margin-top: 18px; font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(243,239,226,0.5); }
+  .dl .alt a { color: inherit; }
+  .dl .alt a:hover { color: var(--orange); }
+
+  /* ---------- EVIDENCE ---------- */
+  .evidence {
+    max-width: 720px;
+    margin: 0 auto 120px;
+    padding: 0 40px;
+    text-align: center;
+  }
+  .evidence .tag { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--orange); margin-bottom: 18px; }
+  .evidence .frame {
+    border: 1.5px solid var(--cream);
+    box-shadow: 12px 12px 0 rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+  }
+  .evidence img { display: block; width: 100%; }
+  .evidence figcaption { margin-top: 16px; font-size: 12px; color: rgba(243,239,226,0.55); font-style: italic; font-family: "Instrument Serif", serif; font-size: 16px; }
 
   footer {
     border-top: 1px solid var(--rule);
-    padding: 30px 32px 40px;
+    padding: 34px 40px 44px;
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 28px;
+    gap: 12px 40px;
     justify-content: space-between;
-    color: #86847c;
-    font-size: 13.5px;
-    line-height: 1.5;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: rgba(243, 239, 226, 0.45);
+    line-height: 1.7;
   }
   footer a { color: inherit; }
+
+  @media (max-width: 640px) {
+    header, .hero { padding-left: 22px; padding-right: 22px; }
+    .notice { padding: 40px 26px; }
+    .stamp { width: 100px; height: 100px; right: 14px; top: -22px; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="mono">Entitled Goose 🪿</div>
-  <nav class="mono">
-    <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose">GitHub ↗</a>
-  </nav>
+  <div>Entitled Goose 🪿 — case file №1</div>
+  <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose">Source ↗</a>
 </header>
 
-<section class="hero">
-  <div class="kicker mono">a desktop pet — macOS &amp; Windows</div>
-  <h1>The goose lives here <span class="honkable" id="honk-title" title="honk">now.</span></h1>
-  <p class="sub">
-    An original, code-drawn goose that waddles across your screen, honks at you,
-    judges you silently, and — as a public service — <em>closes your YouTube tabs.</em>
-    You may continue using your computer. For now.
-  </p>
-  <div class="cta-row">
-    <a class="btn primary" href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases/latest/download/Entitled-Goose-mac-arm64.dmg">↓ Download for macOS</a>
+<section class="hero" id="hero">
+  <div class="hero-copy">
+    <div class="file-line">Official notice · posted to all desktops · macOS &amp; Windows</div>
+    <h1>This desktop<br />is <em>occupied.</em></h1>
+    <p class="hero-sub">
+      A code-drawn goose now lives on your screen. It waddles everywhere, honks with intent,
+      judges silently, counts your absences, and — as a public service — walks to your
+      YouTube tab's close button and pecks it. You may continue using the computer.
+    </p>
+    <div class="hero-hint">the goose is watching your cursor · click to honk</div>
+  </div>
+  <div class="stage">
+    <svg id="gooseSvg" width="360" height="330" viewBox="0 0 360 330"></svg>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true"><span>
+  HONK · NOTICE OF OCCUPANCY · HONK · THE BREAD SITUATION REMAINS UNRESOLVED · HONK · AS PER MY LAST HONK ·
+  HONK · NOTICE OF OCCUPANCY · HONK · THE BREAD SITUATION REMAINS UNRESOLVED · HONK · AS PER MY LAST HONK ·
+</span></div>
+
+<section class="notice-wrap">
+  <div class="notice">
+    <div class="stamp">Approved<br />by the<br />goose</div>
+    <div class="head"><span>Dept. of Desktop Affairs</span><span>Form G-00SE</span></div>
+    <h2>Notice of <em>Occupancy</em></h2>
+    <div class="effective">Effective immediately · non-negotiable · honk</div>
+
+    <div class="bylaw">
+      <div class="num">§1</div>
+      <div>
+        <h3>Focus shall be enforced</h3>
+        <p>YouTube, Instagram, Netflix, TikTok and associated distractions will be closed by beak.
+        The goose walks to the tab's close button, honks twice, and pecks. "closed your youtube.
+        you're welcome." The blocklist is yours to edit.</p>
+      </div>
+    </div>
+    <div class="bylaw">
+      <div class="num">§2</div>
+      <div>
+        <h3>Moods shall be kept</h3>
+        <p>An Entitlement Meter rises while you ignore the resident: content → miffed → indignant →
+        wrath. Honks escalate. Footprints appear. Complaints are filed in writing, in a speech
+        bubble, with a signature.</p>
+      </div>
+    </div>
+    <div class="bylaw">
+      <div class="num">§3</div>
+      <div>
+        <h3>The resident shall be aware</h3>
+        <p>It knows the time ("it is 2am. even geese sleep."), watches your battery — delivering
+        warnings at the battery icon itself — counts your absences to the minute, and can remind
+        you of calendar events. All configurable in the control panel.</p>
+      </div>
+    </div>
+    <div class="bylaw">
+      <div class="num">§4</div>
+      <div>
+        <h3>You shall not be obstructed</h3>
+        <p>The overlay is click-through everywhere except the goose itself, with a failsafe.
+        Pet it (hold ~1s) to apologize. Pick it up and it dangles, unimpressed. Quit, and the next
+        launch opens with: "I noticed you tried to evict me. bold."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dl">
+  <div class="lead">Accept the terms. <em>Install the goose.</em></div>
+  <div class="btn-row">
+    <a class="btn primary" href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases/latest/download/Entitled-Goose-mac-arm64.dmg">↓ macOS · Apple Silicon</a>
+    <a class="btn" href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases/latest/download/Entitled-Goose-mac-x64.dmg">↓ macOS · Intel</a>
     <a class="btn" href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases/latest/download/Entitled-Goose-win-x64.exe">↓ Windows</a>
-    <button class="btn honk" id="honk-btn" type="button">HONK</button>
   </div>
-  <div class="mono" style="margin-top: 14px; color: #86847c;">
-    apple&nbsp;silicon&nbsp;dmg&nbsp;·
-    <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases/latest/download/Entitled-Goose-mac-x64.dmg" style="color: inherit;">intel&nbsp;mac</a>&nbsp;·
-    <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases" style="color: inherit;">all&nbsp;downloads</a>
-  </div>
+  <div class="alt">direct downloads · or browse <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases">all releases ↗</a></div>
 </section>
 
-<div class="pond" aria-hidden="true">
-  <div class="walker">
-    <svg width="220" height="180" viewBox="0 0 220 180">
-      <!-- feet -->
-      <g class="foot-b">
-        <path d="M118 148 L121 168 L104 174 L126 174 L121 168" stroke="#df7a2b" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-      <g class="foot-a">
-        <path d="M102 148 L100 170 L84 176 L108 176 L100 170" stroke="#f58731" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-      <!-- body: long teardrop with raised tail spike (drawn facing right) -->
-      <path fill="#ececec" d="M156 116
-        C 156 138 132 152 104 152
-        C 76 152 52 144 44 128
-        C 36 112 30 92 22 70
-        C 44 84 68 84 96 86
-        C 128 88 156 94 156 116 Z"/>
-      <path fill="#dadada" opacity="0.5" d="M60 140 C 80 150 110 152 128 146 C 110 152 76 152 60 140 Z"/>
-      <!-- neck -->
-      <path d="M138 112 C 146 84 142 62 146 44" stroke="#ececec" stroke-width="15" fill="none" stroke-linecap="round"/>
-      <!-- head -->
-      <ellipse fill="#ececec" cx="150" cy="38" rx="15.5" ry="12.5"/>
-      <!-- beak -->
-      <path fill="#f58731" d="M163 33 Q 180 36 184 40 Q 179 45 163 44 Z"/>
-      <!-- eye -->
-      <circle class="blink" fill="#272725" cx="153" cy="34" r="2.6"/>
-    </svg>
-  </div>
-</div>
-
-<section class="manifesto">
-  <div class="rule-item">
-    <div class="num mono">01</div>
-    <h3>It enforces focus.</h3>
-    <p>YouTube, Instagram, Netflix — the goose marches to the close button, honks twice, and pecks. "closed your youtube. you're welcome."</p>
-  </div>
-  <div class="rule-item">
-    <div class="num mono">02</div>
-    <h3>It keeps score.</h3>
-    <p>An Entitlement Meter rises while you ignore it: content → miffed → indignant → wrath. Honks escalate. Footprints appear. Notes are filed.</p>
-  </div>
-  <div class="rule-item">
-    <div class="num mono">03</div>
-    <h3>It never blocks you.</h3>
-    <p>A transparent overlay — your cursor passes through everything except the goose itself. Pet it to apologize. It may accept.</p>
-  </div>
-  <div class="rule-item">
-    <div class="num mono">04</div>
-    <h3>It remembers.</h3>
-    <p>Quit the app and the next launch opens with: "I noticed you tried to evict me. bold."</p>
-  </div>
-</section>
-
-<figure class="demo">
-  <div class="frame"><img src="demo.gif" alt="The goose waddling across a desktop" loading="lazy" /></div>
+<figure class="evidence">
+  <div class="tag">Exhibit A</div>
+  <div class="frame"><img src="demo.gif" alt="The goose patrolling a desktop" loading="lazy" /></div>
   <figcaption>actual footage. the goose was not compensated for this appearance.</figcaption>
 </figure>
 
 <footer>
-  <div>Original art &amp; audio, drawn and synthesized entirely in code. MIT licensed.</div>
-  <div>Not affiliated with House House, Panic, or samperson. <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose">Source ↗</a></div>
+  <div>Original art &amp; audio, drawn and synthesized entirely in code.<br />MIT licensed. The honk is real. <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose">github ↗</a></div>
+  <div>Not affiliated with House House, Panic, or samperson.<br />No geese were entitled before this project. One is now.</div>
 </footer>
 
 <script>
-// The same formant-synthesized honk the app uses. No recordings anywhere.
-let ctx;
+/* ---------- Interactive goose: cursor-tracking neck (same IK idea as the app) ---------- */
+const svg = document.getElementById('gooseSvg');
+const NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs, parent) {
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(n);
+  return n;
+}
+
+/* static body: long teardrop with raised tail spike, facing right */
+el('ellipse', { cx: 150, cy: 322, rx: 95, ry: 7, fill: 'rgba(0,0,0,0.3)' });
+el('path', {
+  d: 'M 210 236 C 244 240 262 262 258 284 C 254 308 214 322 164 322 C 118 322 76 314 62 296 C 50 280 38 250 20 212 C 56 238 96 240 140 240 C 168 240 192 234 210 236 Z',
+  fill: '#ececec',
+});
+/* feet */
+const footA = el('path', { d: 'M 150 322 L 147 330 M 147 330 L 133 336 L 158 336 L 147 330', stroke: '#f58731', 'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+const footB = el('path', { d: 'M 178 322 L 181 331 M 181 331 L 167 337 L 192 337 L 181 331', stroke: '#d96f1e', 'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+
+const neck = el('path', { fill: 'none', stroke: '#ececec', 'stroke-width': 21, 'stroke-linecap': 'round' });
+const headG = el('g', {});
+el('ellipse', { cx: 0, cy: 0, rx: 23, ry: 18.5, fill: '#ececec' }, headG);
+const beakG = el('g', { transform: 'translate(19,1)' }, headG);
+el('path', { d: 'M 0 -7 Q 24 -6 30 1 Q 23 8 0 7 Z', fill: '#f58731' }, beakG);
+const eye = el('circle', { cx: 6, cy: -6, r: 3.1, fill: '#272725' }, headG);
+
+const shoulder = { x: 208, y: 244 };
+const REST = { x: 232, y: 158 };
+const REACH = 108;
+let head = { ...REST };
+let vel = { x: 0, y: 0 };
+let target = { ...REST };
+let lastRetarget = { x: 0, y: 0 };
+
+function svgPoint(clientX, clientY) {
+  const r = svg.getBoundingClientRect();
+  return { x: (clientX - r.left) * (360 / r.width), y: (clientY - r.top) * (330 / r.height) };
+}
+
+document.addEventListener('mousemove', (e) => {
+  const p = svgPoint(e.clientX, e.clientY);
+  // saccadic: retarget only on meaningful movement, like the real goose
+  if (Math.hypot(p.x - lastRetarget.x, p.y - lastRetarget.y) < 14) return;
+  lastRetarget = p;
+  let dx = p.x - shoulder.x;
+  let dy = p.y - shoulder.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const r = Math.min(d, REACH);
+  target = {
+    x: shoulder.x + (dx / d) * r,
+    y: Math.min(shoulder.y + (dy / d) * r, shoulder.y + 10),
+  };
+});
+
+let blink = false;
+(function blinkLoop() {
+  setTimeout(() => {
+    blink = true;
+    setTimeout(() => { blink = false; blinkLoop(); }, 110);
+  }, 2600 + Math.random() * 3400);
+})();
+
+let honkT = 0;
+let lastT = performance.now();
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min((now - lastT) / 1000, 0.05);
+  lastT = now;
+
+  // snappy spring
+  const k = 1 - Math.pow(2, -dt / 0.045);
+  vel.x = (target.x - head.x) * k / Math.max(dt, 1e-4);
+  vel.y = (target.y - head.y) * k / Math.max(dt, 1e-4);
+  head.x += (target.x - head.x) * k;
+  head.y += (target.y - head.y) * k;
+
+  // neck: quadratic with an S-bias control point
+  const mx = (shoulder.x + head.x) / 2 - (head.y - shoulder.y) * 0.13;
+  const my = (shoulder.y + head.y) / 2 + (head.x - shoulder.x) * 0.10;
+  neck.setAttribute('d', `M ${shoulder.x} ${shoulder.y} Q ${mx} ${my} ${head.x} ${head.y}`);
+
+  const ang = Math.max(-14, Math.min(14, (Math.atan2(head.y - shoulder.y, head.x - shoulder.x) + Math.PI / 2) * 10));
+  honkT = Math.max(0, honkT - dt);
+  const open = honkT > 0.25 ? 1 : honkT / 0.25;
+  headG.setAttribute('transform', `translate(${head.x + 3}, ${head.y - 4}) rotate(${ang})`);
+  beakG.setAttribute('transform', `translate(19,1) rotate(${-open * 14})`);
+  eye.setAttribute('ry', blink ? 0.4 : 3.1);
+  eye.setAttribute('rx', 3.1);
+}
+requestAnimationFrame(tick);
+
+/* ---------- honk (same formant synth as the app) ---------- */
+let actx;
 function honk() {
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  if (ctx.state === 'suspended') ctx.resume();
-  const t0 = ctx.currentTime + 0.01;
-  const jitter = 1 + (Math.random() * 2 - 1) * 0.05;
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  const t0 = actx.currentTime + 0.01;
+  const j = 1 + (Math.random() * 2 - 1) * 0.05;
   const dur = 0.24 + Math.random() * 0.05;
-
-  const osc = ctx.createOscillator();
+  const osc = actx.createOscillator();
   osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(185 * jitter, t0);
-  osc.frequency.exponentialRampToValueAtTime(250 * jitter, t0 + 0.035);
-  osc.frequency.setValueAtTime(250 * jitter, t0 + 0.05);
-  osc.frequency.exponentialRampToValueAtTime(165 * jitter, t0 + dur);
-
-  const f1 = ctx.createBiquadFilter();
-  f1.type = 'bandpass'; f1.frequency.value = 690 * jitter; f1.Q.value = 3.5;
-  const f2 = ctx.createBiquadFilter();
-  f2.type = 'bandpass'; f2.frequency.value = 1580 * jitter; f2.Q.value = 5;
-
-  const shaper = ctx.createWaveShaper();
+  osc.frequency.setValueAtTime(185 * j, t0);
+  osc.frequency.exponentialRampToValueAtTime(250 * j, t0 + 0.035);
+  osc.frequency.setValueAtTime(250 * j, t0 + 0.05);
+  osc.frequency.exponentialRampToValueAtTime(165 * j, t0 + dur);
+  const f1 = actx.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 690 * j; f1.Q.value = 3.5;
+  const f2 = actx.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1580 * j; f2.Q.value = 5;
+  const sh = actx.createWaveShaper();
   const curve = new Float32Array(512);
   for (let i = 0; i < 512; i++) curve[i] = Math.tanh(((i / 511) * 2 - 1) * 3.2);
-  shaper.curve = curve;
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0, t0);
-  gain.gain.linearRampToValueAtTime(0.7, t0 + 0.012);
-  gain.gain.setValueAtTime(0.7, t0 + dur - 0.06);
-  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-
-  osc.connect(f1); osc.connect(f2);
-  f1.connect(shaper); f2.connect(shaper);
-  shaper.connect(gain).connect(ctx.destination);
+  sh.curve = curve;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(0.7, t0 + 0.012);
+  g.gain.setValueAtTime(0.7, t0 + dur - 0.06);
+  g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(f1); osc.connect(f2); f1.connect(sh); f2.connect(sh);
+  sh.connect(g).connect(actx.destination);
   osc.start(t0); osc.stop(t0 + dur + 0.02);
 }
 
-function burst(x, y) {
-  const el = document.createElement('div');
-  el.className = 'honk-burst';
-  el.textContent = 'HONK';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.setProperty('--r', (Math.random() * 24 - 12).toFixed(1) + 'deg');
-  el.style.fontSize = (14 + Math.random() * 10) + 'px';
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 750);
-}
-
-for (const id of ['honk-btn', 'honk-title']) {
-  document.getElementById(id).addEventListener('click', (e) => {
-    honk();
-    burst(e.clientX, e.clientY);
-  });
-}
+document.getElementById('hero').addEventListener('click', (e) => {
+  honk();
+  honkT = 0.45;
+  const b = document.createElement('div');
+  b.className = 'honk-burst';
+  b.textContent = 'HONK';
+  b.style.left = e.clientX + 'px';
+  b.style.top = e.clientY + 'px';
+  b.style.setProperty('--r', (Math.random() * 26 - 13).toFixed(1) + 'deg');
+  b.style.fontSize = (15 + Math.random() * 12) + 'px';
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 800);
+});
 </script>
 </body>
 </html>
