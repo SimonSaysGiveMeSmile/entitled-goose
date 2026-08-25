@@ -30,9 +30,13 @@ function workArea() {
 
 function applyOverlayFlags() {
   if (!win || win.isDestroyed()) return;
+  // fullScreenable must be false BEFORE the workspace call, or macOS hides the
+  // overlay when the focused app is in native fullscreen.
+  win.setFullScreenable(false);
   win.setAlwaysOnTop(true, settings.polite ? 'floating' : 'screen-saver');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   win.setIgnoreMouseEvents(true, { forward: true });
+  if (!win.isVisible()) win.showInactive();
 }
 
 function sendToGoose(channel, data) {
@@ -53,6 +57,7 @@ function createWindow() {
     roundedCorners: false,
     skipTaskbar: true,
     focusable: false,
+    fullscreenable: false,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -187,8 +192,13 @@ app.whenReady().then(() => {
           sendToGoose('space-changed', {});
         }
       );
+      // App/window switches can drop the overlay's on-top level — re-assert.
+      systemPreferences.subscribeWorkspaceNotification(
+        'NSWorkspaceDidActivateApplicationNotification',
+        () => applyOverlayFlags()
+      );
     } catch (err) {
-      console.error('space-change subscription failed', err);
+      console.error('workspace subscription failed', err);
     }
   }
   screen.on('display-added', onDisplayChange);
