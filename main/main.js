@@ -271,6 +271,30 @@ ipcMain.on('r:click-through', (_e, { enable }) => {
   }
 });
 
+// Locate a menu-bar status item (e.g. the battery icon) so the goose can
+// deliver device warnings AT the icon. AX query via ControlCenter; falls back
+// to a top-right estimate if not authorized or not found.
+ipcMain.on('r:menu-pos-req', async (_e, { item }) => {
+  if (item !== 'battery' || process.platform !== 'darwin') return;
+  try {
+    const { execFile } = await import('node:child_process');
+    execFile('osascript', ['-e',
+      `tell application "System Events" to tell process "ControlCenter"
+         set mi to first menu bar item of menu bar 1 whose description contains "atter"
+         set p to position of mi
+         set s to size of mi
+         return (item 1 of p as text) & "," & (item 2 of p as text) & "," & (item 1 of s as text)
+       end tell`,
+    ], { timeout: 3000 }, (err, stdout) => {
+      if (err) return;
+      const [x, y, w] = String(stdout).trim().split(',').map((n) => parseInt(n, 10));
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        sendToGoose('menu-pos', { item: 'battery', x: x + (Number.isFinite(w) ? w / 2 : 12), y: y + 12 });
+      }
+    });
+  } catch { /* fallback stays in renderer */ }
+});
+
 ipcMain.on('r:distraction-close', async (_e, { id }) => {
   if (warden) await warden.close(id); // the goose announces the kill via its bubble
 });

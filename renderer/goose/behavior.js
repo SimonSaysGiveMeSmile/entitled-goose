@@ -114,6 +114,22 @@ export class Behavior {
     if (this.calendarReminded.size > 80) this.calendarReminded.clear();
   }
 
+  onMenuPos(item, pos) {
+    if (item === 'battery' && pos) this._batteryIcon = pos;
+  }
+
+  // Device warnings are delivered AT the battery icon: walk over, point the
+  // beak up at the menu bar, honk, then speak.
+  startBatteryAnnounce(text, urgent) {
+    const wa = this.workArea;
+    if (!this._batteryIcon) {
+      this._batteryIcon = { x: wa.x + wa.width - 130, y: wa.y + 12 }; // estimate
+    }
+    this.events.requestMenuPos && this.events.requestMenuPos('battery'); // refine async
+    this.task = this.makeTask('announce', { text, urgent });
+    this.gapT = 0;
+  }
+
   // Runs each tick: event reactions + ambient awareness. Speaks sparingly —
   // awareness should feel observant, not chatty.
   updateEnv(dt) {
@@ -185,10 +201,9 @@ export class Behavior {
     if (this.awareness.battery && pct != null && !this.env.charging) {
       if (pct <= 5 && this.envCooldownOk('battery5', 300)) {
         wake();
-        this.events.speak('FIVE PERCENT. the nest is losing power. do something.');
-        this.anim.startAction('honk', { volume: 1, target: this.cursor });
+        this.startBatteryAnnounce('FIVE PERCENT. the nest is losing power. do something.', true);
       } else if (pct > 5 && pct <= 15 && !asleep && this.envCooldownOk('battery15', 600)) {
-        this.events.speak(`your battery is at ${pct}%. charge it. I live here.`);
+        this.startBatteryAnnounce(`your battery is at ${pct}%. charge it. I live here.`, false);
       }
     }
 
@@ -594,6 +609,33 @@ export class Behavior {
             t += dt;
             B.intent.lookAt = B.cursor;
             return t > 2.5;
+          },
+        };
+      },
+      announce() {
+        // Walk to the battery icon, aim the beak at it, honk, deliver.
+        let phase = 'walk';
+        let t = 0;
+        return {
+          name, update(dt) {
+            const icon = B._batteryIcon || { x: B.workArea.x + B.workArea.width - 130, y: B.workArea.y + 12 };
+            const stand = { x: B.clampX(icon.x - 30, 120), y: B.anim.minBodyY() };
+            if (phase === 'walk') {
+              if (!B.near(stand, 14)) {
+                B.intent.move = stand;
+                B.intent.speedTier = opts.urgent ? 'run' : 'walk';
+                return false;
+              }
+              phase = 'point';
+            }
+            B.intent.lookAt = icon;
+            t += dt;
+            if (phase === 'point' && t > 0.4 && !A.busy) {
+              A.startAction('honk', { volume: opts.urgent ? 1 : 0.45, target: icon });
+              B.events.speak(opts.text);
+              phase = 'linger';
+            }
+            return phase === 'linger' && t > 3.4;
           },
         };
       },

@@ -5,6 +5,7 @@ const SEND_CHANNELS = new Set([
   'click-through',
   'honked',
   'distraction-close',
+  'menu-pos-req',
 ]);
 const ON_CHANNELS = new Set([
   'cursor',
@@ -17,6 +18,7 @@ const ON_CHANNELS = new Set([
   'space-changed',
   'env',
   'calendar',
+  'menu-pos',
 ]);
 
 contextBridge.exposeInMainWorld('goose', {

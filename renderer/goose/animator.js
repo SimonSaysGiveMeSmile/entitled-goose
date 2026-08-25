@@ -25,6 +25,18 @@ const TIMELINES = {
 };
 const HONK_SOUND_T = 0.18;
 
+// Keep the neck target within (slightly under) chain reach so the solver
+// never fully straightens the neck into a pole, and never sees a wild target.
+function clampNeckTarget(root, tx, ty) {
+  if (!Number.isFinite(tx + ty)) return { x: root.x, y: root.y - 0.4 };
+  const dx = tx - root.x;
+  const dy = ty - root.y;
+  const d = Math.hypot(dx, dy);
+  const maxR = 0.47;
+  if (d <= maxR) return { x: tx, y: ty };
+  return { x: root.x + (dx / d) * maxR, y: root.y + (dy / d) * maxR };
+}
+
 export class GooseAnimator {
   constructor({ scale, groundY, workArea, events }) {
     this.S = scale;
@@ -348,17 +360,19 @@ export class GooseAnimator {
     // Sleep sink stops at the belly touching the ground (belly is at -0.105).
     const bodyDY = this.gait.bob + squash * 0.035 + this.sleepAmt * 0.095 - Math.sin(this.breathT * 3.1) * 0.004;
     const root = { x: GEO.neckRoot.x, y: GEO.neckRoot.y + bodyDY };
-    const localTX = ((this.headWX - this.bodyX) / S) * this.facing;
-    const localTY = (this.headWY - this.bodyY) / S;
+    const localT = clampNeckTarget(root,
+      ((this.headWX - this.bodyX) / S) * this.facing,
+      (this.headWY - this.bodyY) / S);
     this.neckPts[0].x = root.x;
     this.neckPts[0].y = root.y;
-    solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
+    solveFabrik(this.neckPts, this.neckLengths, localT);
     // Bend limits keep the chain kink-free at extreme reach angles so the
     // ribbon never creases or visually detaches from body or head.
-    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.15, maxBend: NECK_BENDS });
+    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.0, maxBend: NECK_BENDS });
     // Higher idle stiffness keeps the relaxed back-swept rest pose dominant.
     const stiffness = this.action ? 0.06 : this.sleepAmt > 0.5 ? 0.5 : 0.42;
     blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, stiffness);
+    this.sanitizeNeck(bodyDY);
 
     // ---- Legs (local space) ----
     const legs = this.computeLegs(bodyDY);
@@ -371,9 +385,9 @@ export class GooseAnimator {
     let uy = tip.y - prev.y;
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
-    const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.35, -0.55, 0.55);
-    this.headDrawWX = this.bodyX + (tip.x + ux * 0.034) * S * this.facing;
-    this.headDrawWY = this.bodyY + (tip.y + uy * 0.034) * S;
+    const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.18, -0.30, 0.30);
+    this.headDrawWX = this.bodyX + (tip.x + ux * 0.012) * S * this.facing;
+    this.headDrawWY = this.bodyY + (tip.y + uy * 0.012) * S;
 
     return {
       bodyX: this.bodyX,
@@ -383,7 +397,7 @@ export class GooseAnimator {
       roll: this.gait.roll,
       tailWag: this.tailWag * 0.05,
       neckPts: this.neckPts,
-      head: { x: tip.x + ux * 0.034, y: tip.y + uy * 0.034 },
+      head: { x: tip.x + ux * 0.012, y: tip.y + uy * 0.012 },
       headAngle,
       beakOpen: this.beakOpen,
       eyelid: this.eyelid,
@@ -411,13 +425,15 @@ export class GooseAnimator {
 
     const bodyDY = 0;
     const root = { x: GEO.neckRoot.x, y: GEO.neckRoot.y };
-    const localTX = ((this.headWX - this.bodyX) / S) * this.facing;
-    const localTY = (this.headWY - this.bodyY) / S;
+    const localT = clampNeckTarget(root,
+      ((this.headWX - this.bodyX) / S) * this.facing,
+      (this.headWY - this.bodyY) / S);
     this.neckPts[0].x = root.x;
     this.neckPts[0].y = root.y;
-    solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
-    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.15, maxBend: NECK_BENDS });
+    solveFabrik(this.neckPts, this.neckLengths, localT);
+    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.0, maxBend: NECK_BENDS });
     blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, 0.2);
+    this.sanitizeNeck(bodyDY);
 
     const tip = this.neckPts[this.neckPts.length - 1];
     const prev = this.neckPts[this.neckPts.length - 2];
@@ -426,8 +442,8 @@ export class GooseAnimator {
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
 
-    this.headDrawWX = this.bodyX + (tip.x + ux * 0.034) * S * this.facing;
-    this.headDrawWY = this.bodyY + (tip.y + uy * 0.034) * S;
+    this.headDrawWX = this.bodyX + (tip.x + ux * 0.012) * S * this.facing;
+    this.headDrawWY = this.bodyY + (tip.y + uy * 0.012) * S;
 
     // Dangling legs: feet hang below the hips with a velocity sway.
     const sway = clamp(-this.vx * 0.0004, -0.08, 0.08);
@@ -446,8 +462,8 @@ export class GooseAnimator {
       roll: pitch,
       tailWag: this.tailWag * 0.05,
       neckPts: this.neckPts,
-      head: { x: tip.x + ux * 0.034, y: tip.y + uy * 0.034 },
-      headAngle: clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.35, -0.55, 0.55),
+      head: { x: tip.x + ux * 0.012, y: tip.y + uy * 0.012 },
+      headAngle: clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.18, -0.30, 0.30),
       beakOpen: this.beakOpen,
       eyelid: 0,
       faceCamera: 0,
@@ -456,6 +472,19 @@ export class GooseAnimator {
       shadowW: 0.30 * Math.max(0.25, 1 - (this.minBodyY() - Math.min(this.bodyY, this.minBodyY())) / (0.9 * S) - this.dragAmt * 0.3),
       sleeping: false,
     };
+  }
+
+  // Last line of defense: a corrupted chain resets to the rest pose instead
+  // of drawing garbage across the desktop.
+  sanitizeNeck(bodyDY) {
+    for (const p of this.neckPts) {
+      if (!Number.isFinite(p.x + p.y) || Math.abs(p.x) > 3 || Math.abs(p.y) > 3) {
+        const rest = neckRestPose(bodyDY);
+        this.neckPts.forEach((q, i) => { q.x = rest[i].x; q.y = rest[i].y; });
+        console.error('[goose] neck chain reset: bad point detected');
+        return;
+      }
+    }
   }
 
   computeLegs(bodyDY) {

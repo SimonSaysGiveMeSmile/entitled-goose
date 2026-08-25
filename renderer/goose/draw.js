@@ -131,7 +131,7 @@ function drawNeck(ctx, pts, color) {
   // Round cap at the tip, bridging into the head.
   const tip = samples[n - 1];
   ctx.beginPath();
-  ctx.arc(tip.x, tip.y, 0.026, 0, Math.PI * 2);
+  ctx.arc(tip.x, tip.y, 0.030, 0, Math.PI * 2);
   ctx.fill();
 }
 

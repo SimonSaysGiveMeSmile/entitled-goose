@@ -65,6 +65,7 @@ async function boot() {
     phrases: state.phrases || [],
     events: {
       speak: (text) => bubble.say(text),
+      requestMenuPos: (item) => window.goose.send('menu-pos-req', { item }),
       closeDistraction: (id) => {
         synth.peck();
         window.goose.send('distraction-close', { id });
@@ -87,10 +88,7 @@ async function boot() {
 
 // ---- Input wiring ----
 
-window.goose.on('window-moved', (b) => {
-  origin = { x: b.x, y: b.y };
-  pendingMoveAt = 0;
-});
+window.goose.on('window-moved', (b) => { origin = { x: b.x, y: b.y }; });
 
 window.goose.on('work-area', (wa) => {
   workArea = wa;
@@ -111,6 +109,8 @@ window.goose.on('settings', (s) => {
 });
 
 window.goose.on('calendar', ({ events }) => behavior && behavior.onCalendar(events));
+
+window.goose.on('menu-pos', (d) => behavior && behavior.onMenuPos(d.item, { x: d.x, y: d.y }));
 
 window.goose.on('apologize', () => behavior && behavior.onApologize());
 
@@ -217,26 +217,28 @@ window.addEventListener('pointerup', () => {
 });
 window.addEventListener('blur', () => { if (dragging) endDrag(); });
 
-// ---- Window follow (renderer-owned to avoid stale-origin flicker) ----
-// The drawing origin updates in the SAME frame the move is ordered, so the
-// goose never draws against a window position it doesn't have yet. Coarse
-// quantized steps keep moves infrequent.
 // ---- Main loop ----
 // The window is static (full work area), so ALL motion is canvas animation:
 // no compositor mismatch, no jitter. Logic steps on every rAF with real dt;
-// drawing is capped at settings.fps (default 120, bounded by the display).
-// Dirty-rect discipline keeps the full-screen transparent canvas cheap: only
-// the region around the goose (plus bubble/VFX) is cleared and repainted.
+// drawing is capped at settings.fps (default 120, bounded by the display),
+// with a full canvas clear every frame — artifact-proof by construction.
 
 let lastFrame = performance.now();
 let lastDraw = 0;
 let stateReportT = 0;
-let prevDirty = null;
 
 function step(dt) {
   // The goose's mind pauses while it is being carried; it has other concerns.
   const intent = dragging ? behavior.intent : behavior.update(dt);
   const state = animator.update(dt, intent, cursor);
+  // Defensive: if any numeric blowup ever poisons the pose, reset rather
+  // than smear garbage across the desktop.
+  if (!Number.isFinite(state.bodyX + state.bodyY)) {
+    animator.bodyX = workArea.x + workArea.width / 2;
+    animator.bodyY = workArea.y + workArea.height - 4;
+    animator.vx = 0; animator.vy = 0;
+    animator.gait.reset(animator.bodyX / settings.scale, 1);
+  }
   vfx.update(dt);
   bubble.update(dt, ctx);
   stateReportT -= dt;
@@ -245,32 +247,6 @@ function step(dt) {
     window.goose.send('goose-state', { meter: behavior.meter, tier: behavior.tierName });
   }
   return state;
-}
-
-function contentRect(state) {
-  // Conservative bounds: dangling feet during drags reach below the foot
-  // line, and the beak at full honk extension reaches past the body span —
-  // anything drawn outside this rect would linger as residue pixels.
-  const S = settings.scale;
-  const head = animator.headWorld();
-  let x0 = Math.min(state.bodyX - 1.1 * S, head.x - 0.4 * S);
-  let x1 = Math.max(state.bodyX + 1.1 * S, head.x + 0.4 * S);
-  let y0 = Math.min(state.bodyY - 1.35 * S, head.y - 0.35 * S);
-  let y1 = state.bodyY + 0.3 * S;
-  for (const f of vfx.footprints) {
-    x0 = Math.min(x0, f.x - 26); x1 = Math.max(x1, f.x + 26);
-    y0 = Math.min(y0, f.y - 16); y1 = Math.max(y1, f.y + 10);
-  }
-  for (const h of vfx.honkLines) {
-    x0 = Math.min(x0, h.x - 100); x1 = Math.max(x1, h.x + 100);
-    y0 = Math.min(y0, h.y - 80); y1 = Math.max(y1, h.y + 80);
-  }
-  const bb = bubble.bounds();
-  if (bb) {
-    x0 = Math.min(x0, bb.x0); x1 = Math.max(x1, bb.x1);
-    y0 = Math.min(y0, bb.y0); y1 = Math.max(y1, bb.y1);
-  }
-  return { x0, y0, x1, y1 };
 }
 
 function frame(now) {
@@ -287,14 +263,11 @@ function frame(now) {
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Clear only where content was and will be.
-  const cur = contentRect(state);
-  const d = prevDirty
-    ? { x0: Math.min(prevDirty.x0, cur.x0), y0: Math.min(prevDirty.y0, cur.y0),
-        x1: Math.max(prevDirty.x1, cur.x1), y1: Math.max(prevDirty.y1, cur.y1) }
-    : cur;
-  prevDirty = cur;
-  ctx.clearRect(d.x0 - origin.x - 2, d.y0 - origin.y - 2, (d.x1 - d.x0) + 4, (d.y1 - d.y0) + 4);
+  // Full clear every frame. (A dirty-rect optimization lived here briefly —
+  // its failure mode was smeared residue across the screen: one bad
+  // coordinate makes clearRect a silent no-op and nothing erases again.
+  // Full clearing is GPU-cheap and cannot leave artifacts.)
+  ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
   // World space (screen px), shifted by the static window origin.
   ctx.save();
