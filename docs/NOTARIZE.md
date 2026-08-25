@@ -39,41 +39,53 @@ xcrun notarytool store-credentials goose-notary \
 This saves a Keychain profile named `goose-notary` so the password never has
 to appear in a shell command or env var again.
 
-## Step 3 — Enable notarization in the build config (one time)
+## Step 3 — Build config (already done)
 
-In `package.json`, under `build.mac`, add:
+`package.json` has `"notarize": true` under `build.mac`, and the `dist` /
+`dist:mac` npm scripts set `APPLE_KEYCHAIN_PROFILE=goose-notary` so the
+credentials come straight from the Keychain profile of Step 2.
 
-```json
-"notarize": true
-```
-
-electron-builder picks up credentials from the environment at build time.
+⚠️ electron-builder treats `notarize: true` as *best-effort*: if it finds no
+credentials (env vars or keychain profile) it logs a one-line warning,
+**skips notarization, and still exits 0**. That is why the profile is baked
+into the npm scripts — always build through them, never bare
+`npx electron-builder --mac`, or you can ship an un-notarized DMG without
+noticing. Always run the Step 5 check before uploading.
 
 ## Step 4 — Build a notarized release
 
 From the project root:
 
 ```sh
-export APPLE_ID="YOUR_APPLE_ID@example.com"
-export APPLE_APP_SPECIFIC_PASSWORD="abcd-efgh-ijkl-mnop"
-export APPLE_TEAM_ID="4QUC4B3L36"
-npx electron-builder --mac
+npm run dist:mac
 ```
 
-electron-builder will sign, upload to Apple, wait for the verdict (usually
-2–10 minutes; first submission can take longer), and staple the ticket to the
-app and DMG automatically. If the build hangs at "notarizing", that is normal —
-it is waiting on Apple.
+That's it — no env exports needed. electron-builder signs, uploads to Apple,
+waits for the verdict (usually 2–10 minutes; first submission can take
+longer), and staples the ticket to the `.app`. If the build hangs at
+"notarizing", that is normal — it is waiting on Apple.
+
+(Alternative without the keychain profile: export `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID=4QUC4B3L36` and run
+`npx electron-builder --mac`.)
 
 ## Step 5 — Verify before shipping
 
+Validate the **.app**, not the DMG — electron-builder staples the ticket to
+the app bundle inside; the DMG container itself is intentionally left
+unsigned/unstapled (Gatekeeper checks the app, and this keeps the DMG bytes
+identical to what latest-mac.yml hashed for auto-update):
+
 ```sh
-xcrun stapler validate "release/Entitled-Goose-mac-arm64.dmg"
-spctl -a -t open --context context:primary-signature -v "release/Entitled-Goose-mac-arm64.dmg"
+xcrun stapler validate "release/mac-arm64/Entitled Goose.app"
+spctl -a -vv "release/mac-arm64/Entitled Goose.app"
 ```
 
-Expected: `The validate action worked!` and `source=Notarized Developer ID`.
-Only upload artifacts to the GitHub release after both checks pass.
+Expected: `The validate action worked!` and `accepted` with
+`source=Notarized Developer ID`. (x64 build lives in `release/mac/`.)
+Running `stapler validate` on the `.dmg` file will report error 65 — that is
+expected, not a failure. Only upload artifacts to the GitHub release after
+both `.app` checks pass.
 
 ## Troubleshooting
 

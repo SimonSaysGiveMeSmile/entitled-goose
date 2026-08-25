@@ -1,14 +1,14 @@
 {
   "name": "entitled-goose",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A desktop pet goose that acts like it owns your desktop. Original art & audio; not affiliated with House House, Panic, or samperson.",
   "main": "main/main.js",
   "type": "module",
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "dist": "electron-builder --mac --win",
-    "dist:mac": "electron-builder --mac",
+    "dist": "APPLE_KEYCHAIN_PROFILE=goose-notary electron-builder --mac --win",
+    "dist:mac": "APPLE_KEYCHAIN_PROFILE=goose-notary electron-builder --mac",
     "dist:win": "electron-builder --win"
   },
   "author": "tianjiahe11@gmail.com",
@@ -53,7 +53,8 @@
       "extendInfo": {
         "LSUIElement": true
       },
-      "identity": "Jiahe Tian (4QUC4B3L36)"
+      "identity": "Jiahe Tian (4QUC4B3L36)",
+      "notarize": true
     },
     "dmg": {
       "title": "Entitled Goose"

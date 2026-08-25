@@ -84,14 +84,18 @@ export function saveNotes(phrases) {
   }
 }
 
-export function loadNotes() {
+// Callers that hold a long-lived settings object (main.js) MUST pass it in:
+// the migration bumps notesVersion on that same object, otherwise the next
+// saveSettings() of the stale copy writes notesVersion 1 back to disk and the
+// "one-time" migration re-runs forever, resurrecting deleted phrases.
+export function loadNotes(liveSettings = null) {
+  const settings = liveSettings || loadSettings();
   try {
     const notes = JSON.parse(fs.readFileSync(notesPath(), 'utf8'));
     if (Array.isArray(notes) && notes.length) {
       // One-time migration: older installs were seeded with only the first 8
       // phrases and the saved file shadows newer defaults — union them in,
       // and retire the static-time joke for the dynamic {time} version.
-      const settings = loadSettings();
       if ((settings.notesVersion || 1) < 2) {
         const merged = notes.filter((n) => n !== 'honk was sent at 9:04. it is now much later.');
         for (const n of DEFAULT_NOTES) if (!merged.includes(n)) merged.push(n);
@@ -108,7 +112,6 @@ export function loadNotes() {
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
     fs.writeFileSync(notesPath(), JSON.stringify(DEFAULT_NOTES, null, 2));
-    const settings = loadSettings();
     settings.notesVersion = 2;
     saveSettings(settings);
   } catch (err) {

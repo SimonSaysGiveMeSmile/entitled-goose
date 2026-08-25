@@ -171,7 +171,12 @@ export class FocusWarden {
   }
 
   async poll() {
-    if (this.pending.size > 0) return;
+    // The enabled gate stays FIRST: with enforcement off there must be zero
+    // System Events AppleScript (it triggers the Automation TCC prompt users
+    // turned the feature off to avoid) and zero window closing on any
+    // platform. The ambient frontmost signal therefore only flows while
+    // enforcement is on — the adaptive remarks degrade gracefully without it.
+    if (!this.isEnabled() || this.pending.size > 0) return;
     if (process.platform === 'win32') return this.pollWindows();
     if (process.platform !== 'darwin') return;
 
@@ -180,7 +185,6 @@ export class FocusWarden {
     );
     if (!front || front === 'Electron' || front === 'Entitled Goose') return;
     if (this.onFrontmost) this.onFrontmost(front);
-    if (!this.isEnabled()) return;
 
     if (this.blocklist.apps.includes(front)) {
       if (this.onCooldown('app:' + front)) return;

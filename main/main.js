@@ -157,7 +157,7 @@ function buildTrayMenu() {
           saveSettings(settings);
         },
       },
-      { label: 'Edit goose phrases…', click: () => { loadNotes(); shell.openPath(notesPath()); } },
+      { label: 'Edit goose phrases…', click: () => { loadNotes(settings); shell.openPath(notesPath()); } },
       { type: 'separator' },
       {
         label: 'About',
@@ -282,7 +282,7 @@ ipcMain.on('r:goose-state', (_e, s) => { gooseState = s; });
 // ---- Control panel ----
 ipcMain.handle('panel:get', () => ({
   settings,
-  phrases: loadNotes(),
+  phrases: loadNotes(settings),
   blocklist: loadBlocklist(),
   meter: gooseState.meter,
   tier: gooseState.tier,
@@ -339,9 +339,12 @@ ipcMain.on('r:open-panel', () => openPanel());
 ipcMain.on('panel:check-updates', () => updater && updater.check());
 ipcMain.on('panel:install-update', () => updater && updater.install());
 
-// Plain restart (not the updater path): relaunch with the same command line
-// and exit hard so autoInstallOnAppQuit can't hijack it into an update flow.
+// Restart from the panel. When an update is already downloaded a bare
+// relaunch would race the staged installer (Squirrel/NSIS hook process exit
+// regardless of app.exit), respawning the old bundle mid-swap — so route
+// through quitAndInstall and come back up on the new version instead.
 ipcMain.on('panel:restart', () => {
+  if (updater && updater.state.status === 'ready') return updater.install();
   app.relaunch();
   app.exit(0);
 });
@@ -399,7 +402,7 @@ ipcMain.handle('r:get-state', () => {
     workArea: currentWorkArea(),
     windowBounds: win ? win.getBounds() : null,
     settings,
-    phrases: loadNotes(),
+    phrases: loadNotes(settings),
     grudgePending: grudge,
   };
 });

@@ -241,14 +241,15 @@
     });
   }
 
+  const sendPhrases = () => {
+    const phrases = $('phrases').value.split('\n').map((l) => l.trim()).filter(Boolean);
+    window.panel.setPhrases(phrases);
+    $('saved').style.opacity = 1;
+    setTimeout(() => { $('saved').style.opacity = 0; }, 1200);
+  };
   $('phrases').addEventListener('input', () => {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      const phrases = $('phrases').value.split('\n').map((l) => l.trim()).filter(Boolean);
-      window.panel.setPhrases(phrases);
-      $('saved').style.opacity = 1;
-      setTimeout(() => { $('saved').style.opacity = 0; }, 1200);
-    }, 600);
+    saveTimer = setTimeout(() => { saveTimer = null; sendPhrases(); }, 600);
   });
 
   let blTimer = null;
@@ -262,17 +263,22 @@
   };
   const saveBlocklist = () => {
     clearTimeout(blTimer);
-    blTimer = setTimeout(sendBlocklist, 1000);
+    blTimer = setTimeout(() => { blTimer = null; sendBlocklist(); }, 1000);
   };
   $('blockDomains').addEventListener('input', saveBlocklist);
   $('blockApps').addEventListener('input', saveBlocklist);
-  // Flush pending edits when the panel closes or loses focus — the debounce
-  // timer dies with the window otherwise.
-  window.addEventListener('beforeunload', () => { if (blTimer) { clearTimeout(blTimer); sendBlocklist(); } });
-  window.addEventListener('blur', () => { if (blTimer) { clearTimeout(blTimer); blTimer = null; sendBlocklist(); } });
+  // Flush pending edits when the panel closes, loses focus, or restarts the
+  // app — the debounce timers die with the window otherwise.
+  const flushPending = () => {
+    if (blTimer) { clearTimeout(blTimer); blTimer = null; sendBlocklist(); }
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; sendPhrases(); }
+  };
+  window.addEventListener('beforeunload', flushPending);
+  window.addEventListener('blur', flushPending);
 
   $('apologize').addEventListener('click', () => window.panel.apologize());
   $('restart').addEventListener('click', () => {
+    flushPending(); // app.exit() fires no beforeunload — save edits first
     $('restart').textContent = 'Restarting…';
     window.panel.restart();
   });

@@ -108,14 +108,20 @@ export class Behavior {
     if (this.tier >= 2) add('mood', 2, `for the record, I have been {tier} for a while now.`);
     if (Date.now() - this.sessionStart > 3 * 3600_000) add('session', 2, `{sessionMin} minutes together today and not one crumb of bread.`);
     if (this.stats.pokes > 2) add('pokes', 2, `you have poked me ${this.stats.pokes} times today. I keep records.`);
-    add('pool', 3, null); // the user's own phrase pool
+    // The pool is exempt from the recent-remark filter: it is the guaranteed
+    // fallback, and dedupe there is the deck's job. Filtering it empties the
+    // candidate list on quiet systems and there is nothing left to say.
+    c.push({ key: 'pool', w: 3, t: null });
 
     const total = c.reduce((a, x) => a + x.w, 0);
     let r = Math.random() * total;
     let chosen = c[c.length - 1];
     for (const x of c) { r -= x.w; if (r <= 0) { chosen = x; break; } }
-    this.recentRemarks.push(chosen.key);
-    if (this.recentRemarks.length > 6) this.recentRemarks.shift();
+    if (!chosen) return this.renderPhrase(this.poolDraw());
+    if (chosen.key !== 'pool') {
+      this.recentRemarks.push(chosen.key);
+      if (this.recentRemarks.length > 6) this.recentRemarks.shift();
+    }
     return this.renderPhrase(chosen.t == null ? this.poolDraw() : chosen.t);
   }
 
@@ -144,7 +150,7 @@ export class Behavior {
       const h = Math.floor(total / 60);
       const m = total % 60;
       const h12 = ((h + 11) % 12) + 1;
-      p = p.replace('{time}', `${h12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`);
+      p = p.split('{time}').join(`${h12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`);
     }
     return p;
   }
@@ -240,6 +246,15 @@ export class Behavior {
 
     while (this.envEvents.length) {
       const event = this.envEvents.shift();
+      // A real absence (sleep, lock, walk-away) invalidates the wall-clock
+      // "today" counters — without this the first morning remark reports the
+      // overnight hours as app-dwell/session time.
+      if ((event === 'resume' || event === 'unlock')
+          && Math.max(this.wasIdleSeconds, this.env.idleSeconds || 0) > 1800) {
+        this.front.since = Date.now();
+        this.sessionStart = Date.now();
+        this.stats = { cursorPx: 0, honks: 0, tabsClosed: 0, pokes: 0, pets: 0 };
+      }
       if (!this.awareness.time) continue;
       if ((event === 'resume' || event === 'unlock') && this.envCooldownOk('greet', 120)) {
         const h = this.env.hour;
