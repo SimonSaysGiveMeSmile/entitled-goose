@@ -20,6 +20,7 @@
   "build": {
     "appId": "com.sideproj.entitled-goose",
     "productName": "Entitled Goose",
+    "artifactName": "Entitled-Goose-${os}-${arch}.${ext}",
     "directories": {
       "output": "release",
       "buildResources": "build"

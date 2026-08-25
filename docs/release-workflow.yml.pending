@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - run: npx electron-builder --win --publish never
       - name: Upload installer to release
-        run: gh release upload ${{ github.ref_name }} "release/Entitled Goose Setup 0.1.0.exe" --clobber
+        run: gh release upload ${{ github.ref_name }} "release/Entitled-Goose-win-x64.exe" --clobber
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
