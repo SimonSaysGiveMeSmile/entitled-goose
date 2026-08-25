@@ -6,6 +6,7 @@ const SEND_CHANNELS = new Set([
   'honked',
   'distraction-close',
   'menu-pos-req',
+  'open-panel',
 ]);
 const ON_CHANNELS = new Set([
   'cursor',

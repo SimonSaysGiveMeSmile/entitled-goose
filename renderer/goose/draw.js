@@ -24,7 +24,7 @@ export const GEO = {
   hipFar: { x: -0.035, y: -0.185 },
   legUpper: 0.105,
   legLower: 0.105,
-  restHead: { x: 0.15, y: -0.87 },
+  restHead: { x: 0.13, y: -0.78 },
 };
 
 // Authored neck rest pose: an upright S that settles slightly BACKWARD over
@@ -35,11 +35,11 @@ export function neckRestPose(bodyDY = 0) {
   // short and stiff at the skull.
   const pts = [
     { x: r.x, y: r.y },
-    { x: r.x + 0.018, y: r.y - 0.115 },
-    { x: r.x + 0.002, y: r.y - 0.225 },
-    { x: r.x - 0.012, y: r.y - 0.325 },
-    { x: r.x + 0.004, y: r.y - 0.410 },
-    { x: r.x + 0.022, y: r.y - 0.455 },
+    { x: r.x + 0.014, y: r.y - 0.092 },
+    { x: r.x + 0.002, y: r.y - 0.180 },
+    { x: r.x - 0.010, y: r.y - 0.260 },
+    { x: r.x + 0.003, y: r.y - 0.328 },
+    { x: r.x + 0.018, y: r.y - 0.364 },
   ];
   for (const p of pts) p.y += bodyDY;
   return pts;

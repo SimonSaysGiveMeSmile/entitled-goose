@@ -256,6 +256,8 @@ ipcMain.on('panel:set-phrases', (_e, phrases) => {
 
 ipcMain.on('panel:apologize', () => sendToGoose('apologize', {}));
 
+ipcMain.on('r:open-panel', () => openPanel());
+
 // Failsafe: solid mode must be continuously renewed by the renderer, so a
 // missed IPC or a hung renderer can never leave the overlay blocking real
 // computer use — it always falls back to click-through.

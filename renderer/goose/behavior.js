@@ -51,6 +51,7 @@ export class Behavior {
     this.wasIdleSeconds = 0;
     // Per-category toggles, mirrored from settings via the control panel.
     this.awareness = { battery: true, time: true, reports: true, calendar: false };
+    this.energy = 50; // 0-100 from settings: restless vs sleepy
     this.calendarEvents = [];
     this.calendarReminded = new Set();
 
@@ -323,7 +324,7 @@ export class Behavior {
       if (this.task.update(dt)) {
         this.lastTaskName = this.task.name;
         this.task = null;
-        this.gapT = 0.6 + Math.random() * 1.6;
+        this.gapT = (0.6 + Math.random() * 1.6) * (1.5 - this.energy / 100);
         this.resetIntent();
       }
     } else {
@@ -356,9 +357,10 @@ export class Behavior {
     const entries = Object.entries({ ...WEIGHTS, report: [0.05, 0.06, 0.06, 0.04] })
       .map(([name, w]) => {
         let weight = name === this.lastTaskName ? w[t] * 0.25 : w[t];
+        if (name === 'sleep' && !drowsy) weight *= 1.6 - this.energy / 100 * 1.2;
         if (drowsy) {
           // A wrathful goose sleeps lightly, but even it winds down at night.
-          if (name === 'sleep') weight = t >= 2 ? 0.25 : 0.5;
+          if (name === 'sleep') weight = (t >= 2 ? 0.25 : 0.5) * (1.6 - this.energy / 100 * 1.2);
           else if (name === 'demand' || name === 'honk') weight *= 0.25;
         }
         return [name, weight];

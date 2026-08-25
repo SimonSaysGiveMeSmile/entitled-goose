@@ -9,6 +9,7 @@ const DEFAULTS = {
   focusEnforce: true, // the goose closes entertainment windows to keep you working
   footsteps: false, // quiet webbed taps on foot plants (off: they get old fast)
   fps: 120, // max frame rate cap (actual rate limited by the display)
+  energy: 50, // 0-100: high = fast and restless, low = slow and sleepy
   scale: 170, // goose standing height in px
   awareness: {
     battery: true, // battery warnings

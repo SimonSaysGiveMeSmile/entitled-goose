@@ -74,6 +74,7 @@ async function boot() {
   });
 
   if (settings.awareness) behavior.awareness = { ...behavior.awareness, ...settings.awareness };
+  if (settings.energy != null) { behavior.energy = settings.energy; animator.energy = settings.energy; }
   if (pendingEnv) {
     behavior.onEnv(pendingEnv);
     pendingEnv = null;
@@ -104,8 +105,12 @@ window.goose.on('settings', (s) => {
   if (behavior) {
     behavior.polite = settings.polite;
     if (settings.awareness) behavior.awareness = { ...behavior.awareness, ...settings.awareness };
+    if (settings.energy != null) behavior.energy = settings.energy;
   }
-  if (animator && settings.scale) animator.S = settings.scale;
+  if (animator) {
+    if (settings.scale) animator.S = settings.scale;
+    if (settings.energy != null) animator.energy = settings.energy;
+  }
 });
 
 window.goose.on('calendar', ({ events }) => behavior && behavior.onCalendar(events));
@@ -204,13 +209,20 @@ window.addEventListener('pointerdown', () => {
     downAt = null;
   }, 1100);
 });
+let lastPokeAt = 0;
 window.addEventListener('pointerup', () => {
   clearTimeout(petTimer);
   if (dragging) {
     endDrag();
   } else if (downAt !== null && performance.now() - downAt < 1100) {
-    behavior.onPoke();
-    synth.flutter();
+    // Double-click the goose → control panel (single click = poke).
+    if (performance.now() - lastPokeAt < 380) {
+      window.goose.send('open-panel', {});
+    } else {
+      behavior.onPoke();
+      synth.flutter();
+    }
+    lastPokeAt = performance.now();
   }
   downAt = null;
   downCursor = null;

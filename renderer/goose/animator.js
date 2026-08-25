@@ -29,7 +29,7 @@ function clampNeckTarget(root, tx, ty) {
   const dx = tx - root.x;
   const dy = ty - root.y;
   const d = Math.hypot(dx, dy);
-  const maxR = 0.47;
+  const maxR = 0.38; // 20% shorter neck overall
   if (d <= maxR) return { x: tx, y: ty };
   return { x: root.x + (dx / d) * maxR, y: root.y + (dy / d) * maxR };
 }
@@ -98,6 +98,7 @@ export class GooseAnimator {
 
     this.action = null; // { name, t, timeline, fired:{}, target:{x,y} }
     this.honkVolume = 0.7;
+    this.energy = 50; // 0-100, set from settings
 
     this.dragging = false;
     this.dragAmt = 0; // eased 0..1 for pose blending
@@ -223,7 +224,7 @@ export class GooseAnimator {
     const dist = Math.hypot(dx, dy);
     if (mv != null && dist > 6) {
       this.arrived = false;
-      const maxSpeed = SPEEDS[intent.speedTier || 'walk'];
+      const maxSpeed = SPEEDS[intent.speedTier || 'walk'] * (0.7 + this.energy / 100 * 0.6);
       // Arrive: slow down inside the stopping radius.
       const target = Math.min(maxSpeed, dist * 3.2);
       const tvx = (dx / dist) * target;

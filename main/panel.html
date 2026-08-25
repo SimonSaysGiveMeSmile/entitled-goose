@@ -131,6 +131,10 @@
     <input type="range" id="scale" min="120" max="260" step="10" />
   </div>
   <div class="row">
+    <label>Energy<div class="hint">high: fast &amp; restless · low: slow &amp; sleepy</div></label>
+    <input type="range" id="energy" min="0" max="100" step="5" />
+  </div>
+  <div class="row">
     <label>Max frame rate</label>
     <select id="fps">
       <option value="30">30 fps</option>
@@ -178,6 +182,7 @@
     $('focusEnforce').checked = s.settings.focusEnforce;
     $('footsteps').checked = s.settings.footsteps;
     $('scale').value = s.settings.scale;
+    $('energy').value = s.settings.energy ?? 50;
     $('fps').value = String(s.settings.fps || 120);
     awareness = { battery: true, time: true, reports: true, calendar: false, ...(s.settings.awareness || {}) };
     for (const k of ['battery', 'time', 'reports', 'calendar']) $('aw-' + k).checked = awareness[k];
@@ -195,6 +200,7 @@
   }
   $('scale').addEventListener('change', () => window.panel.setSettings({ scale: Number($('scale').value) }));
   $('fps').addEventListener('change', () => window.panel.setSettings({ fps: Number($('fps').value) }));
+  $('energy').addEventListener('change', () => window.panel.setSettings({ energy: Number($('energy').value) }));
   for (const k of ['battery', 'time', 'reports', 'calendar']) {
     $('aw-' + k).addEventListener('change', () => {
       awareness = { ...awareness, [k]: $('aw-' + k).checked };
