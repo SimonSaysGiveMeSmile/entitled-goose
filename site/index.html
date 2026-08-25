@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Entitled Goose — a desktop pet that owns your desktop</title>
+<meta name="description" content="A goose for your desktop. It honks, judges you silently, and closes your YouTube tabs. You may continue using your computer. For now." />
+<meta property="og:title" content="Entitled Goose" />
+<meta property="og:description" content="A desktop pet that owns your desktop. Honks included." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..900,100,1&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f4f1e8;
+    --ink: #272725;
+    --goose: #ececec;
+    --goose-shade: #dadada;
+    --orange: #f58731;
+    --lawn: #45785f;
+    --rule: #d8d3c4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Fraunces", serif;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--orange); color: var(--paper); }
+
+  .mono {
+    font-family: "Azeret Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+  header a { color: var(--ink); text-decoration: none; }
+  header a:hover { color: var(--orange); }
+
+  .hero {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 88px 32px 40px;
+  }
+  .kicker {
+    color: var(--lawn);
+    margin-bottom: 22px;
+    animation: rise 0.7s 0.05s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+  h1 {
+    font-size: clamp(56px, 11vw, 148px);
+    line-height: 0.92;
+    margin: 0 0 30px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    font-variation-settings: "SOFT" 100, "WONK" 1;
+    animation: rise 0.7s 0.15s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+  h1 .honkable {
+    color: var(--orange);
+    cursor: pointer;
+    display: inline-block;
+    transition: transform 0.12s;
+  }
+  h1 .honkable:hover { transform: rotate(-2deg) scale(1.02); }
+  h1 .honkable:active { transform: scale(0.97); }
+  .sub {
+    font-size: clamp(18px, 2.4vw, 24px);
+    max-width: 30em;
+    line-height: 1.45;
+    margin: 0 0 40px;
+    font-weight: 400;
+    animation: rise 0.7s 0.25s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+  .sub em { color: var(--lawn); }
+
+  .cta-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    animation: rise 0.7s 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+  .btn {
+    font-family: "Azeret Mono", monospace;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 15px 26px;
+    border-radius: 999px;
+    border: 1.5px solid var(--ink);
+    color: var(--ink);
+    transition: transform 0.15s, background 0.15s, color 0.15s;
+    display: inline-block;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn.primary { background: var(--ink); color: var(--paper); }
+  .btn.primary:hover { background: var(--orange); border-color: var(--orange); }
+  .btn.honk { border-color: var(--orange); color: var(--orange); }
+  .btn.honk:active { transform: scale(0.96); }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* ---- the goose ---- */
+  .pond {
+    position: relative;
+    height: 210px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    overflow: hidden;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 120px, rgba(69, 120, 95, 0.05) 120px 121px);
+  }
+  .walker {
+    position: absolute;
+    bottom: 14px;
+    left: -160px;
+    animation: cross 26s linear infinite;
+  }
+  .walker svg { display: block; animation: waddle 0.55s ease-in-out infinite; transform-origin: 50% 88%; }
+  @keyframes cross {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(100vw + 340px)); }
+  }
+  @keyframes waddle {
+    0%, 100% { transform: rotate(2.4deg) translateY(0); }
+    50% { transform: rotate(-2.4deg) translateY(-2.5px); }
+  }
+  .foot-a { animation: stepA 0.55s ease-in-out infinite; transform-origin: top; }
+  .foot-b { animation: stepB 0.55s ease-in-out infinite; transform-origin: top; }
+  @keyframes stepA { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+  @keyframes stepB { 0%,100% { transform: translateY(-7px) } 50% { transform: translateY(0) } }
+  .blink { animation: blink 5.2s infinite; }
+  @keyframes blink { 0%, 96%, 100% { transform: scaleY(1) } 97.5% { transform: scaleY(0.1) } }
+
+  .honk-burst {
+    position: fixed;
+    pointer-events: none;
+    font-family: "Azeret Mono", monospace;
+    font-weight: 500;
+    color: var(--orange);
+    animation: burst 0.7s ease-out forwards;
+    z-index: 99;
+  }
+  @keyframes burst {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(0.6) rotate(var(--r)); }
+    to { opacity: 0; transform: translate(-50%, -140%) scale(1.35) rotate(var(--r)); }
+  }
+
+  /* ---- manifesto ---- */
+  .manifesto {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 72px 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0;
+  }
+  .rule-item {
+    border-left: 1px solid var(--rule);
+    padding: 6px 26px 10px;
+  }
+  .rule-item:first-child { border-left: 0; padding-left: 0; }
+  .rule-item .num { color: var(--orange); margin-bottom: 14px; }
+  .rule-item h3 { font-size: 21px; margin: 0 0 8px; font-weight: 600; }
+  .rule-item p { margin: 0; line-height: 1.5; font-size: 15.5px; color: #55534d; }
+
+  /* ---- demo ---- */
+  .demo {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 32px 90px;
+    text-align: center;
+  }
+  .demo .frame {
+    border: 1.5px solid var(--ink);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 10px 10px 0 rgba(69, 120, 95, 0.16);
+  }
+  .demo img { display: block; width: 100%; }
+  .demo figcaption { margin-top: 14px; color: #706e66; font-size: 14px; font-style: italic; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding: 30px 32px 40px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    justify-content: space-between;
+    color: #86847c;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mono">Entitled Goose 🪿</div>
+  <nav class="mono">
+    <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose">GitHub ↗</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="kicker mono">a desktop pet — macOS &amp; Windows</div>
+  <h1>The goose lives here <span class="honkable" id="honk-title" title="honk">now.</span></h1>
+  <p class="sub">
+    An original, code-drawn goose that waddles across your screen, honks at you,
+    judges you silently, and — as a public service — <em>closes your YouTube tabs.</em>
+    You may continue using your computer. For now.
+  </p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases">↓ Download for macOS</a>
+    <a class="btn" href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases">↓ Windows</a>
+    <button class="btn honk" id="honk-btn" type="button">HONK</button>
+  </div>
+</section>
+
+<div class="pond" aria-hidden="true">
+  <div class="walker">
+    <svg width="220" height="180" viewBox="0 0 220 180">
+      <!-- feet -->
+      <g class="foot-b">
+        <path d="M118 148 L121 168 L104 174 L126 174 L121 168" stroke="#df7a2b" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g class="foot-a">
+        <path d="M102 148 L100 170 L84 176 L108 176 L100 170" stroke="#f58731" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <!-- body: long teardrop with raised tail spike (drawn facing right) -->
+      <path fill="#ececec" d="M156 116
+        C 156 138 132 152 104 152
+        C 76 152 52 144 44 128
+        C 36 112 30 92 22 70
+        C 44 84 68 84 96 86
+        C 128 88 156 94 156 116 Z"/>
+      <path fill="#dadada" opacity="0.5" d="M60 140 C 80 150 110 152 128 146 C 110 152 76 152 60 140 Z"/>
+      <!-- neck -->
+      <path d="M138 112 C 146 84 142 62 146 44" stroke="#ececec" stroke-width="15" fill="none" stroke-linecap="round"/>
+      <!-- head -->
+      <ellipse fill="#ececec" cx="150" cy="38" rx="15.5" ry="12.5"/>
+      <!-- beak -->
+      <path fill="#f58731" d="M163 33 Q 180 36 184 40 Q 179 45 163 44 Z"/>
+      <!-- eye -->
+      <circle class="blink" fill="#272725" cx="153" cy="34" r="2.6"/>
+    </svg>
+  </div>
+</div>
+
+<section class="manifesto">
+  <div class="rule-item">
+    <div class="num mono">01</div>
+    <h3>It enforces focus.</h3>
+    <p>YouTube, Instagram, Netflix — the goose marches to the close button, honks twice, and pecks. "closed your youtube. you're welcome."</p>
+  </div>
+  <div class="rule-item">
+    <div class="num mono">02</div>
+    <h3>It keeps score.</h3>
+    <p>An Entitlement Meter rises while you ignore it: content → miffed → indignant → wrath. Honks escalate. Footprints appear. Notes are filed.</p>
+  </div>
+  <div class="rule-item">
+    <div class="num mono">03</div>
+    <h3>It never blocks you.</h3>
+    <p>A transparent overlay — your cursor passes through everything except the goose itself. Pet it to apologize. It may accept.</p>
+  </div>
+  <div class="rule-item">
+    <div class="num mono">04</div>
+    <h3>It remembers.</h3>
+    <p>Quit the app and the next launch opens with: "I noticed you tried to evict me. bold."</p>
+  </div>
+</section>
+
+<figure class="demo">
+  <div class="frame"><img src="demo.gif" alt="The goose waddling across a desktop" loading="lazy" /></div>
+  <figcaption>actual footage. the goose was not compensated for this appearance.</figcaption>
+</figure>
+
+<footer>
+  <div>Original art &amp; audio, drawn and synthesized entirely in code. MIT licensed.</div>
+  <div>Not affiliated with House House, Panic, or samperson. <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose">Source ↗</a></div>
+</footer>
+
+<script>
+// The same formant-synthesized honk the app uses. No recordings anywhere.
+let ctx;
+function honk() {
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime + 0.01;
+  const jitter = 1 + (Math.random() * 2 - 1) * 0.05;
+  const dur = 0.24 + Math.random() * 0.05;
+
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(185 * jitter, t0);
+  osc.frequency.exponentialRampToValueAtTime(250 * jitter, t0 + 0.035);
+  osc.frequency.setValueAtTime(250 * jitter, t0 + 0.05);
+  osc.frequency.exponentialRampToValueAtTime(165 * jitter, t0 + dur);
+
+  const f1 = ctx.createBiquadFilter();
+  f1.type = 'bandpass'; f1.frequency.value = 690 * jitter; f1.Q.value = 3.5;
+  const f2 = ctx.createBiquadFilter();
+  f2.type = 'bandpass'; f2.frequency.value = 1580 * jitter; f2.Q.value = 5;
+
+  const shaper = ctx.createWaveShaper();
+  const curve = new Float32Array(512);
+  for (let i = 0; i < 512; i++) curve[i] = Math.tanh(((i / 511) * 2 - 1) * 3.2);
+  shaper.curve = curve;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(0.7, t0 + 0.012);
+  gain.gain.setValueAtTime(0.7, t0 + dur - 0.06);
+  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+
+  osc.connect(f1); osc.connect(f2);
+  f1.connect(shaper); f2.connect(shaper);
+  shaper.connect(gain).connect(ctx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+
+function burst(x, y) {
+  const el = document.createElement('div');
+  el.className = 'honk-burst';
+  el.textContent = 'HONK';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.setProperty('--r', (Math.random() * 24 - 12).toFixed(1) + 'deg');
+  el.style.fontSize = (14 + Math.random() * 10) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 750);
+}
+
+for (const id of ['honk-btn', 'honk-title']) {
+  document.getElementById(id).addEventListener('click', (e) => {
+    honk();
+    burst(e.clientX, e.clientY);
+  });
+}
+</script>
+</body>
+</html>
