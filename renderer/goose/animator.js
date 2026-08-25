@@ -162,7 +162,9 @@ export class GooseAnimator {
   beakWorld() {
     const h = this.headWorld();
     return {
-      x: h.x + this.facing * (GEO.headRx + 0.09) * this.S,
+      // Drawn bill tip = beak hinge (0.040) + 1.04 * beakLen (0.147) from
+      // the head origin — keep in sync with drawHead or honk vfx drift.
+      x: h.x + this.facing * 0.193 * this.S,
       y: h.y,
     };
   }

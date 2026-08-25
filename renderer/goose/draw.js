@@ -18,8 +18,8 @@ export const GEO = {
   neckRoot: { x: 0.165, y: -0.40 },
   neckSegments: 5,
   neckLength: 0.52,
-  headRx: 0.088,
-  headRy: 0.071,
+  headRx: 0.072, // MUST match the drawHead ellipse (drawn size, not aspiration)
+  headRy: 0.056,
   hipNear: { x: 0.015, y: -0.175 },
   hipFar: { x: -0.035, y: -0.185 },
   legUpper: 0.105,
@@ -107,17 +107,23 @@ function drawNeck(ctx, pts, color) {
   ];
   // A ribbon polygon's flat end edge can poke past the rotated head at
   // extreme angles (lowest head position). A round line cap is a semicircle
-  // centered ON the chain tip; the head ellipse (ry 0.071) always covers cap
-  // radius (0.046) + head anchor offset (0.012) at any rotation, so no edge
-  // can ever be exposed — same invariant the site goose gets for free.
+  // centered on the stroke end, and the end is TRIMMED 0.014 short of the
+  // chain tip so cap radius (0.046) + head-center offset (~0.025) always
+  // stays inside the drawn head ellipse (0.072x0.056) at any rotation.
   const samples = sampleCatmullRom(rooted, 20);
+  const n = samples.length;
+  const end = samples[n - 1];
+  const prev2 = samples[n - 2];
+  const el = Math.hypot(end.x - prev2.x, end.y - prev2.y) || 1;
+  end.x -= ((end.x - prev2.x) / el) * 0.014;
+  end.y -= ((end.y - prev2.y) / el) * 0.014;
   ctx.strokeStyle = color;
   ctx.lineWidth = 0.092;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
   ctx.moveTo(samples[0].x, samples[0].y);
-  for (let i = 1; i < samples.length; i++) ctx.lineTo(samples[i].x, samples[i].y);
+  for (let i = 1; i < n; i++) ctx.lineTo(samples[i].x, samples[i].y);
   ctx.stroke();
 }
 
