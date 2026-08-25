@@ -102,8 +102,10 @@ function repositionForGoose(gooseX) {
 }
 
 function buildTray() {
-  tray = new Tray(nativeImage.createEmpty());
-  tray.setTitle('🪿');
+  const iconName = process.platform === 'darwin' ? 'trayTemplate.png' : 'tray-win.png';
+  const icon = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', iconName));
+  tray = new Tray(icon);
+  if (process.platform === 'darwin') tray.setTitle('🪿');
   tray.setToolTip('Entitled Goose');
   const rebuild = () => {
     tray.setContextMenu(Menu.buildFromTemplate([

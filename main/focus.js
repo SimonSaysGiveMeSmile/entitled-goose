@@ -36,6 +36,52 @@ function osascript(script, timeout = 3000) {
   });
 }
 
+function powershell(script, timeout = 4000) {
+  return new Promise((resolve, reject) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+// Foreground window on Windows: process name, title, and horizontal center.
+const PS_FOREGROUND = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class FG {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder t, int n);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  public struct RECT { public int Left, Top, Right, Bottom; }
+}
+"@
+$h = [FG]::GetForegroundWindow()
+$sb = New-Object System.Text.StringBuilder 512
+[void][FG]::GetWindowText($h, $sb, 512)
+$procId = 0
+[void][FG]::GetWindowThreadProcessId($h, [ref]$procId)
+$r = New-Object FG+RECT
+[void][FG]::GetWindowRect($h, [ref]$r)
+$p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+"$($p.ProcessName)|$([Math]::Round(($r.Left+$r.Right)/2))|$($sb.ToString())"
+`.trim();
+
+const PS_CLOSE_FOREGROUND = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class CW {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+}
+"@
+[void][CW]::SendMessage([CW]::GetForegroundWindow(), 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+`.trim();
+
 function blocklistPath() {
   return path.join(app.getPath('userData'), 'blocklist.json');
 }
@@ -101,6 +147,8 @@ export class FocusWarden {
 
   async poll() {
     if (!this.isEnabled() || this.pending.size > 0) return;
+    if (process.platform === 'win32') return this.pollWindows();
+    if (process.platform !== 'darwin') return;
 
     const front = await osascript(
       'tell application "System Events" to get name of first application process whose frontmost is true'
@@ -154,6 +202,44 @@ export class FocusWarden {
           osascript(`tell application "System Events" to tell process "${front}" to keystroke "w" using command down`), key);
       }
     }
+  }
+
+  // Windows: title-keyword matching only (no sanctioned way to read tab URLs).
+  // The distraction must still be the foreground window when the goose arrives,
+  // otherwise the close is skipped — we never close an unrelated window.
+  async pollWindows() {
+    const BROWSERS = ['chrome', 'msedge', 'brave', 'opera', 'firefox', 'vivaldi', 'arc'];
+    const out = await powershell(PS_FOREGROUND);
+    const [proc, centerX, ...titleParts] = out.split('|');
+    const title = titleParts.join('|');
+    if (!proc || proc.toLowerCase() === 'electron' || proc === 'Entitled Goose') return;
+
+    const lowerProc = proc.toLowerCase();
+    const lowerTitle = (title || '').toLowerCase();
+    const isBrowser = BROWSERS.includes(lowerProc);
+    const appBlocked = this.blocklist.apps.some((a) => a.toLowerCase() === lowerProc);
+    const titleBlocked = isBrowser && this.blocklist.titleKeywords.some((k) => lowerTitle.includes(k));
+    if (!appBlocked && !titleBlocked) return;
+
+    const key = (appBlocked ? 'app:' : 'title:') + (appBlocked ? lowerProc : lowerTitle.slice(0, 40));
+    if (this.onCooldown(key)) return;
+
+    const closer = async () => {
+      // Re-check the foreground before closing: the user may have switched away.
+      const now = await powershell(PS_FOREGROUND);
+      const [nowProc, , ...nowTitleParts] = now.split('|');
+      const nowTitle = nowTitleParts.join('|').toLowerCase();
+      if (nowProc?.toLowerCase() !== lowerProc) return;
+      if (titleBlocked && !this.blocklist.titleKeywords.some((k) => nowTitle.includes(k))) return;
+      await powershell(PS_CLOSE_FOREGROUND);
+    };
+
+    const x = parseInt(centerX, 10);
+    const id = this.nextId++;
+    this.pending.set(id, { closer, label: appBlocked ? proc : 'that tab' });
+    this.cooldowns.set(key, Date.now());
+    this.onDistraction({ id, label: appBlocked ? proc : 'that tab', x: Number.isFinite(x) ? x : null });
+    setTimeout(() => this.pending.delete(id), 20_000);
   }
 
   async emit(label, appName, closer, cooldownKey) {
