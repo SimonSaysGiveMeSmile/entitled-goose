@@ -1,0 +1,125 @@
+# Tag-push CI/CD: `git tag vX.Y.Z && git push origin vX.Y.Z` builds, signs,
+# notarizes, and publishes the release. Existing installs then auto-update via
+# electron-updater, which watches these exact GitHub release assets.
+#
+# Required repo secrets (set via `gh secret set`):
+#   CSC_LINK                     base64 .p12 export of "Developer ID Application: Jiahe Tian (4QUC4B3L36)"
+#   CSC_KEY_PASSWORD             password of that .p12
+#   APPLE_ID                     developer Apple ID email
+#   APPLE_APP_SPECIFIC_PASSWORD  app-specific password (account.apple.com)
+#   APPLE_TEAM_ID                4QUC4B3L36
+#
+# Safety: build.mac.identity is pinned in package.json, so a missing/wrong
+# cert FAILS the mac build — CI can never publish unsigned mac artifacts —
+# and the stapler step fails the job if notarization was silently skipped.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {} # dry run: builds everything, publishes nothing
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Tag must match package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "package.json says $PKG but tag is $GITHUB_REF_NAME — auto-update metadata would lie"
+            exit 1
+          fi
+
+  mac:
+    needs: test
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build, sign, notarize
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --mac --publish never
+      - name: Fail if notarization was skipped
+        run: |
+          xcrun stapler validate "release/mac-arm64/Entitled Goose.app"
+          xcrun stapler validate "release/mac/Entitled Goose.app"
+          /usr/sbin/spctl -a -vv "release/mac-arm64/Entitled Goose.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/latest-mac.yml
+
+  win:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [mac, win]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release (this is what pushes the auto-update)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
+      - name: Landing-page download URLs must serve this release
+        run: |
+          sleep 15
+          for f in Entitled-Goose-mac-arm64.dmg Entitled-Goose-mac-x64.dmg Entitled-Goose-win-x64.exe; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -I \
+              "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$f")
+            if [ "$code" != "302" ]; then echo "$f -> HTTP $code"; exit 1; fi
+            echo "$f -> 302 ok"
+          done
