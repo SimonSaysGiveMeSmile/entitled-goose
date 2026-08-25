@@ -16,6 +16,7 @@ const ON_CHANNELS = new Set([
   'distraction',
   'speak',
   'space-changed',
+  'env',
 ]);
 
 contextBridge.exposeInMainWorld('goose', {

@@ -5,6 +5,7 @@ import { loadSettings, saveSettings, loadNotes, saveNotes, notesPath } from './s
 import { closeAllNotes } from './notes.js';
 import { FocusWarden } from './focus.js';
 import { openPanel } from './panel.js';
+import { EnvMonitor } from './env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,7 @@ let tray = null;
 let settings = loadSettings();
 let quitting = false;
 let warden = null;
+let envMonitor = null;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -74,6 +76,8 @@ function createWindow() {
     sendToGoose('work-area', workArea());
     sendToGoose('window-moved', win.getBounds());
     sendToGoose('settings', settings);
+    // Renderer boot races the first env timer: send a snapshot on every load.
+    if (envMonitor) sendToGoose('env', envMonitor.snapshot());
   });
 
   win.once('ready-to-show', () => {
@@ -93,6 +97,9 @@ function moveWindowTo(x, y) {
   const cx = Math.min(Math.max(Math.round(x), wa.x), wa.x + wa.width - WIN_W);
   const cy = Math.min(Math.max(Math.round(y), wa.y), wa.y + wa.height - WIN_H);
   win.setBounds({ x: cx, y: cy, width: WIN_W, height: WIN_H });
+  // Confirm AFTER the native move so the renderer swaps its drawing origin
+  // only once the window is really there — no one-frame offset flash.
+  sendToGoose('window-moved', win.getBounds());
 }
 
 function buildTray() {
@@ -214,6 +221,10 @@ app.whenReady().then(() => {
     }),
   });
   warden.start();
+
+  // The goose keeps an eye on the clock and the machine.
+  envMonitor = new EnvMonitor((env) => sendToGoose('env', env));
+  envMonitor.start();
 });
 
 ipcMain.on('r:move-window', (_e, { x, y }) => moveWindowTo(x, y));

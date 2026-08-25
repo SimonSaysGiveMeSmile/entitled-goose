@@ -346,7 +346,8 @@ export class GooseAnimator {
     // Bend limits keep the chain kink-free at extreme reach angles so the
     // ribbon never creases or visually detaches from body or head.
     limitBends(this.neckPts, this.neckLengths);
-    const stiffness = this.action ? 0.06 : this.sleepAmt > 0.5 ? 0.5 : 0.30;
+    // Higher idle stiffness keeps the relaxed back-swept rest pose dominant.
+    const stiffness = this.action ? 0.06 : this.sleepAmt > 0.5 ? 0.5 : 0.42;
     blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, stiffness);
 
     // ---- Legs (local space) ----

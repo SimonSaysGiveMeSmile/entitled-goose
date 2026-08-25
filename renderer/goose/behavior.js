@@ -44,6 +44,12 @@ export class Behavior {
     this.cursor = { x: workArea.x + workArea.width / 2, y: workArea.y + workArea.height / 2 };
     this.cursorSpeed = 0;
 
+    // Environmental awareness (time, machine state, battery, your absences).
+    this.env = { hour: 12, minute: 0, idleSeconds: 0, load1: 0, cpus: 4 };
+    this.envEvents = [];
+    this.envCooldowns = {}; // key → seconds remaining
+    this.wasIdleSeconds = 0;
+
     this.intent = { move: null, speedTier: 'walk', lookAt: null, faceCamera: false, showBubble: false, sleep: false };
   }
 
@@ -69,6 +75,108 @@ export class Behavior {
   gooseDistToCursor() {
     const b = this.anim;
     return Math.hypot(this.cursor.x - b.bodyX, this.cursor.y - (b.bodyY - b.S * 0.5));
+  }
+
+  get isNight() {
+    return this.env.hour >= 23 || this.env.hour < 6;
+  }
+
+  timeString() {
+    const h = this.env.hour;
+    const m = String(this.env.minute).padStart(2, '0');
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${m}${h < 12 ? 'am' : 'pm'}`;
+  }
+
+  envCooldownOk(key, seconds) {
+    if ((this.envCooldowns[key] || 0) > 0) return false;
+    this.envCooldowns[key] = seconds;
+    return true;
+  }
+
+  onEnv(env) {
+    if (env.idleSeconds != null) this.wasIdleSeconds = Math.max(this.wasIdleSeconds, env.idleSeconds);
+    this.env = { ...this.env, ...env };
+    if (env.event) this.envEvents.push(env.event);
+  }
+
+  onBattery(pct, charging) {
+    this.env.batteryPct = pct;
+    this.env.charging = charging;
+  }
+
+  // Runs each tick: event reactions + ambient awareness. Speaks sparingly —
+  // awareness should feel observant, not chatty.
+  updateEnv(dt) {
+    for (const key of Object.keys(this.envCooldowns)) {
+      this.envCooldowns[key] = Math.max(0, this.envCooldowns[key] - dt);
+    }
+
+    const asleep = this.task?.name === 'sleep';
+    const wake = () => { if (this.task?.name === 'sleep') { this.task = null; this.gapT = 1.5; this.resetIntent(); } };
+
+    while (this.envEvents.length) {
+      const event = this.envEvents.shift();
+      if ((event === 'resume' || event === 'unlock') && this.envCooldownOk('greet', 120)) {
+        const h = this.env.hour;
+        let line = h < 6 ? 'it is the middle of the night. bold of us.'
+          : h < 12 ? 'good morning. the bread situation remains unresolved.'
+          : h < 18 ? 'welcome back. I saw nothing.'
+          : 'evening. I kept everything exactly as you left it. mostly.';
+        // Fold the counted absence into the greeting so it is never lost.
+        if (this.wasIdleSeconds > 600) {
+          const mins = Math.round(this.wasIdleSeconds / 60);
+          this.wasIdleSeconds = 0;
+          line += ` you were gone ${mins} minutes. I counted.`;
+          this.meter = clamp(this.meter + Math.min(0.15, mins * 0.004), 0, 1);
+        }
+        wake();
+        this.events.speak(line);
+        this.anim.startAction('honk', { volume: 0.4, target: this.cursor });
+      } else if (event === 'on-battery' && !asleep && this.envCooldownOk('power', 600)) {
+        this.events.speak('unplugged, are we. living dangerously.');
+      } else if (event === 'theme' && !asleep && this.envCooldownOk('theme', 1800)) {
+        this.events.speak(this.env.dark ? 'dark mode. moody.' : 'light mode. blinding. thanks.');
+      }
+    }
+
+    // Returned after an at-desk absence (no sleep/lock event involved).
+    if (this.wasIdleSeconds > 600 && this.env.idleSeconds < 10) {
+      if (this.envCooldownOk('absence', 120)) {
+        const mins = Math.round(this.wasIdleSeconds / 60);
+        this.wasIdleSeconds = 0;
+        wake();
+        this.events.speak(`you were gone ${mins} minutes. I counted.`);
+        this.meter = clamp(this.meter + Math.min(0.15, mins * 0.004), 0, 1);
+      }
+    } else if (this.env.idleSeconds < 10 && this.wasIdleSeconds < 600) {
+      this.wasIdleSeconds = 0;
+    }
+
+    // Battery concern: separate cooldown tiers so the emergency is never
+    // throttled by the earlier nag. The 5% alarm wakes a sleeping goose.
+    const pct = this.env.batteryPct;
+    if (pct != null && !this.env.charging) {
+      if (pct <= 5 && this.envCooldownOk('battery5', 300)) {
+        wake();
+        this.events.speak('FIVE PERCENT. the nest is losing power. do something.');
+        this.anim.startAction('honk', { volume: 1, target: this.cursor });
+      } else if (pct > 5 && pct <= 15 && !asleep && this.envCooldownOk('battery15', 600)) {
+        this.events.speak(`your battery is at ${pct}%. charge it. I live here.`);
+      }
+    }
+
+    // Machine under strain: sympathy, of a sort. (load1 is null on Windows.)
+    if (this.env.load1 != null && this.env.load1 > this.env.cpus * 1.5
+        && !asleep && this.envCooldownOk('load', 900)) {
+      this.events.speak('your computer is wheezing. what did you do.');
+    }
+
+    // Deep night with the user still typing: judgment.
+    if (this.isNight && this.env.hour >= 1 && this.env.hour < 5 && !asleep
+        && this.env.idleSeconds < 30 && this.envCooldownOk('latenight', 1800)) {
+      this.events.speak(`it is ${this.timeString()}. even geese sleep. this is unwell.`);
+    }
   }
 
   onCursor(p, dt) {
@@ -150,6 +258,7 @@ export class Behavior {
     this.speakCooldown -= dt;
     this.visitCooldown -= dt;
     this.userIdleT += dt;
+    this.updateEnv(dt);
 
     // ---- Entitlement meter dynamics ----
     const gooseDist = this.gooseDistToCursor();
@@ -197,10 +306,21 @@ export class Behavior {
 
   pickTask() {
     const t = this.tier;
-    const entries = Object.entries(WEIGHTS)
-      .map(([name, w]) => [name, name === this.lastTaskName ? w[t] * 0.25 : w[t]])
+    // Ambient awareness shapes the deck: at night (or while you're away) the
+    // goose mostly sleeps and doesn't demand; status reports surface rarely.
+    const drowsy = this.isNight || this.env.idleSeconds > 240;
+    const entries = Object.entries({ ...WEIGHTS, report: [0.05, 0.06, 0.06, 0.04] })
+      .map(([name, w]) => {
+        let weight = name === this.lastTaskName ? w[t] * 0.25 : w[t];
+        if (drowsy) {
+          // A wrathful goose sleeps lightly, but even it winds down at night.
+          if (name === 'sleep') weight = t >= 2 ? 0.25 : 0.5;
+          else if (name === 'demand' || name === 'honk') weight *= 0.25;
+        }
+        return [name, weight];
+      })
       .filter(([name, w]) => w > 0 && !(this.polite && name === 'demand'))
-      .filter(([name]) => name !== 'speak' || this.speakCooldown <= 0);
+      .filter(([name]) => (name !== 'speak' && name !== 'report') || this.speakCooldown <= 0);
     let total = entries.reduce((a, [, w]) => a + w, 0);
     let r = Math.random() * total;
     for (const [name, w] of entries) {
@@ -279,11 +399,16 @@ export class Behavior {
           name, update(dt) {
             t -= dt;
             B.intent.sleep = true;
-            // Woken rudely → offended honk.
+            // Woken rudely → offended. At night it grumbles instead of
+            // honking, so the drowsy sleep weighting can't create a honk loop.
             if (B.gooseDistToCursor() < 130) {
               B.meter = clamp(B.meter + 0.06, 0, 1);
               B.intent.sleep = false;
-              A.startAction('honk', { volume: B.honkVolume(), target: B.cursor });
+              if (B.isNight) {
+                if (B.envCooldownOk('grumble', 60)) B.events.speak('I was ASLEEP.');
+              } else {
+                A.startAction('honk', { volume: B.honkVolume(), target: B.cursor });
+              }
               return true;
             }
             return t <= 0;
@@ -396,6 +521,44 @@ export class Behavior {
               if (A.busy) return false;
               B.events.speak(opts.text || B.nextPhrase());
               B.speakCooldown = SPEAK_COOLDOWN;
+              phase = 'linger';
+            }
+            t += dt;
+            B.intent.lookAt = B.cursor;
+            return t > 2.5;
+          },
+        };
+      },
+      report() {
+        // The goose delivers an unsolicited status report.
+        const target = {
+          x: B.clampX(B.cursor.x + (Math.random() < 0.5 ? -1 : 1) * 200),
+          y: B.clampY(B.cursor.y + 150),
+        };
+        let phase = 'walk';
+        let t = 0;
+        return {
+          name, update(dt) {
+            if (phase === 'walk') {
+              if (!B.near(target, 12)) {
+                B.intent.move = target;
+                return false;
+              }
+              phase = 'honk';
+              A.startAction('honk', { volume: B.honkVolume() * 0.8, target: B.cursor });
+            }
+            if (phase === 'honk') {
+              if (A.busy) return false;
+              const bits = [`status report: ${B.timeString()}.`];
+              if (B.env.batteryPct != null) {
+                bits.push(`battery ${B.env.batteryPct}%${B.env.charging ? ' (charging)' : ''}.`);
+              }
+              bits.push(B.env.load1 != null && B.env.load1 > B.env.cpus ? 'computer: struggling.' : 'computer: fine.');
+              bits.push('me: unappreciated.');
+              B.events.speak(bits.join(' '));
+              B.speakCooldown = SPEAK_COOLDOWN * 2;
+              // A report already mentioned the battery; hold the nag a while.
+              B.envCooldowns.battery15 = Math.max(B.envCooldowns.battery15 || 0, 300);
               phase = 'linger';
             }
             t += dt;

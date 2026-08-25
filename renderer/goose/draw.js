@@ -24,19 +24,20 @@ export const GEO = {
   hipFar: { x: -0.035, y: -0.185 },
   legUpper: 0.105,
   legLower: 0.105,
-  restHead: { x: 0.22, y: -0.88 },
+  restHead: { x: 0.15, y: -0.87 },
 };
 
-// Authored neck rest pose (gentle S-curve), root to head base.
+// Authored neck rest pose: an upright S that settles slightly BACKWARD over
+// the body (how a relaxed goose actually carries it), head barely leading.
 export function neckRestPose(bodyDY = 0) {
   const r = GEO.neckRoot;
   const pts = [
     { x: r.x, y: r.y },
-    { x: r.x + 0.045, y: r.y - 0.10 },
-    { x: r.x + 0.055, y: r.y - 0.21 },
-    { x: r.x + 0.040, y: r.y - 0.315 },
-    { x: r.x + 0.048, y: r.y - 0.415 },
-    { x: r.x + 0.070, y: r.y - 0.47 },
+    { x: r.x + 0.018, y: r.y - 0.10 },
+    { x: r.x + 0.002, y: r.y - 0.21 },
+    { x: r.x - 0.012, y: r.y - 0.315 },
+    { x: r.x + 0.004, y: r.y - 0.415 },
+    { x: r.x + 0.028, y: r.y - 0.468 },
   ];
   for (const p of pts) p.y += bodyDY;
   return pts;

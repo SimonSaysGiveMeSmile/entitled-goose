@@ -72,6 +72,11 @@ async function boot() {
     },
   });
 
+  if (pendingEnv) {
+    behavior.onEnv(pendingEnv);
+    pendingEnv = null;
+  }
+
   if (state.grudgePending) {
     setTimeout(() => behavior && behavior.deliverGrudge(), 8000);
   }
@@ -81,7 +86,10 @@ async function boot() {
 
 // ---- Input wiring ----
 
-window.goose.on('window-moved', (b) => { origin = { x: b.x, y: b.y }; });
+window.goose.on('window-moved', (b) => {
+  origin = { x: b.x, y: b.y };
+  pendingMoveAt = 0;
+});
 
 window.goose.on('work-area', (wa) => {
   workArea = wa;
@@ -105,6 +113,22 @@ window.goose.on('distraction', (d) => behavior && behavior.enforce(d));
 window.goose.on('speak', ({ text }) => bubble && bubble.say(text));
 
 window.goose.on('space-changed', () => behavior && behavior.onSpaceChange());
+
+let pendingEnv = null;
+window.goose.on('env', (env) => {
+  if (behavior) behavior.onEnv(env);
+  else pendingEnv = env; // arrives before boot() finishes; applied there
+});
+
+// Battery lives in the renderer's web API; poll it into the behavior.
+if (navigator.getBattery) {
+  navigator.getBattery().then((battery) => {
+    const report = () => behavior && behavior.onBattery(Math.round(battery.level * 100), battery.charging);
+    battery.addEventListener('levelchange', report);
+    battery.addEventListener('chargingchange', report);
+    const wait = setInterval(() => { if (behavior) { report(); clearInterval(wait); } }, 1000);
+  }).catch(() => {});
+}
 
 let lastCursor = null;
 let lastCursorTime = 0;
@@ -191,24 +215,53 @@ window.addEventListener('blur', () => { if (dragging) endDrag(); });
 // The drawing origin updates in the SAME frame the move is ordered, so the
 // goose never draws against a window position it doesn't have yet. Coarse
 // quantized steps keep moves infrequent.
-const FOLLOW_QUANTUM = 64;
+// Window follow: GLIDE, don't jump. Once the goose leaves the comfort zone the
+// window slides after it in small capped steps (≤18px per move, ≤30Hz), with
+// hysteresis so it settles once the goose is comfortably framed again. One
+// move in flight at a time: the drawing origin only swaps when main confirms
+// the native move, so any mismatch is a single ≤18px frame — imperceptible —
+// instead of the old one-shot ~200px recenter flash.
+const MAX_STEP = 18;
+const START_SLACK_X = 190;
+const START_SLACK_Y = 100;
+const STOP_SLACK = 40;
+let pendingMoveAt = 0;
+let gliding = false;
+let lastMoveSent = 0;
 
 function followWindow() {
-  // Window size comes from the actual window — keep main/main.js WIN_W/WIN_H
-  // as the single source of truth.
+  const now = performance.now();
+  if (pendingMoveAt && now - pendingMoveAt < 400) return;
+  pendingMoveAt = 0;
+  if (now - lastMoveSent < 33) return;
+
   const WIN_W = window.innerWidth;
   const WIN_H = window.innerHeight;
-  const anchorX = origin.x + WIN_W / 2;
-  const anchorY = origin.y + WIN_H * 0.72;
-  if (Math.abs(animator.bodyX - anchorX) <= 200 && Math.abs(animator.bodyY - anchorY) <= 105) return;
-  const q = FOLLOW_QUANTUM;
-  let tx = Math.round((animator.bodyX - WIN_W / 2) / q) * q;
-  let ty = Math.round((animator.bodyY - WIN_H * 0.72) / q) * q;
+  const idealX = animator.bodyX - WIN_W / 2;
+  const idealY = animator.bodyY - WIN_H * 0.72;
+  const dx = idealX - origin.x;
+  const dy = idealY - origin.y;
+
+  if (!gliding) {
+    if (Math.abs(dx) <= START_SLACK_X && Math.abs(dy) <= START_SLACK_Y) return;
+    gliding = true;
+  } else if (Math.abs(dx) <= STOP_SLACK && Math.abs(dy) <= STOP_SLACK) {
+    gliding = false;
+    return;
+  }
+
+  const sx = Math.max(-MAX_STEP, Math.min(MAX_STEP, dx));
+  const sy = Math.max(-MAX_STEP, Math.min(MAX_STEP, dy));
+  let tx = Math.round(origin.x + sx);
+  let ty = Math.round(origin.y + sy);
   tx = Math.min(Math.max(tx, workArea.x), workArea.x + workArea.width - WIN_W);
   ty = Math.min(Math.max(ty, workArea.y), workArea.y + workArea.height - WIN_H);
   if (tx !== origin.x || ty !== origin.y) {
-    origin = { x: tx, y: ty };
+    pendingMoveAt = now;
+    lastMoveSent = now;
     window.goose.send('move-window', { x: tx, y: ty });
+  } else {
+    gliding = false; // pinned against a screen edge
   }
 }
 
