@@ -75,7 +75,22 @@ export class Behavior {
         [this.phraseDeck[i], this.phraseDeck[j]] = [this.phraseDeck[j], this.phraseDeck[i]];
       }
     }
-    return this.phraseDeck.pop();
+    return this.renderPhrase(this.phraseDeck.pop());
+  }
+
+  // Phrase templates: {time} becomes a time 1-3 hours ago, so "honk was sent
+  // at {time}. it is now much later." always refers to a real, recent honk.
+  renderPhrase(p) {
+    if (typeof p === 'string' && p.includes('{time}')) {
+      const back = 60 + Math.floor(Math.random() * 120);
+      let total = this.env.hour * 60 + this.env.minute - back;
+      while (total < 0) total += 1440;
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+      const h12 = ((h + 11) % 12) + 1;
+      p = p.replace('{time}', `${h12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`);
+    }
+    return p;
   }
 
   gooseDistToCursor() {

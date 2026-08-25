@@ -12,6 +12,7 @@ const DEFAULTS = {
   energy: 50, // 0-100: high = fast and restless, low = slow and sleepy
   shushUntil: 0, // epoch ms; goose stays quiet until then
   scale: 170, // goose standing height in px
+  notesVersion: 1, // phrase-pool defaults version (migrated in loadNotes)
   awareness: {
     battery: true, // battery warnings
     time: true, // time-of-day greetings, absence counting, late-night judgment
@@ -28,7 +29,7 @@ const DEFAULT_NOTES = [
   'this desktop is under new management.',
   're: bread. still waiting.',
   'your wallpaper is fine, I guess.',
-  'honk was sent at 9:04. it is now much later.',
+  'honk was sent at {time}. it is now much later.',
   'per the terms of our arrangement (I honk, you listen):',
   'I have reviewed your open tabs. we need to talk.',
   'a lesser goose would let this slide.',
@@ -86,13 +87,30 @@ export function saveNotes(phrases) {
 export function loadNotes() {
   try {
     const notes = JSON.parse(fs.readFileSync(notesPath(), 'utf8'));
-    if (Array.isArray(notes) && notes.length) return notes;
+    if (Array.isArray(notes) && notes.length) {
+      // One-time migration: older installs were seeded with only the first 8
+      // phrases and the saved file shadows newer defaults — union them in,
+      // and retire the static-time joke for the dynamic {time} version.
+      const settings = loadSettings();
+      if ((settings.notesVersion || 1) < 2) {
+        const merged = notes.filter((n) => n !== 'honk was sent at 9:04. it is now much later.');
+        for (const n of DEFAULT_NOTES) if (!merged.includes(n)) merged.push(n);
+        fs.writeFileSync(notesPath(), JSON.stringify(merged, null, 2));
+        settings.notesVersion = 2;
+        saveSettings(settings);
+        return merged;
+      }
+      return notes;
+    }
   } catch {
     // fall through: seed the user-editable file with defaults
   }
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
     fs.writeFileSync(notesPath(), JSON.stringify(DEFAULT_NOTES, null, 2));
+    const settings = loadSettings();
+    settings.notesVersion = 2;
+    saveSettings(settings);
   } catch (err) {
     console.error('notes seed failed', err);
   }
