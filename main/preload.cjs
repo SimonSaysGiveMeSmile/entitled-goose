@@ -20,6 +20,7 @@ const ON_CHANNELS = new Set([
   'env',
   'calendar',
   'menu-pos',
+  'frontmost',
 ]);
 
 contextBridge.exposeInMainWorld('goose', {

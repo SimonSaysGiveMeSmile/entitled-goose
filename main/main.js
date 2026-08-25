@@ -245,6 +245,7 @@ app.whenReady().then(() => {
   // The goose's productivity-enforcement instincts.
   warden = new FocusWarden({
     isEnabled: () => settings.focusEnforce,
+    onFrontmost: (app) => sendToGoose('frontmost', { app }),
     onDistraction: (d) => sendToGoose('distraction', d),
     onPermissionNeeded: () => sendToGoose('speak', {
       text: 'I tried to close your youtube but the computer says I need permission. System Settings → Privacy → Automation. fix it.',

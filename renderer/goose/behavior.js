@@ -41,6 +41,12 @@ export class Behavior {
     this.phrasePool = phrases.length ? phrases : ['honk.'];
     this.phraseDeck = [];
 
+    // Live session stats feeding the adaptive remark engine.
+    this.stats = { cursorPx: 0, honks: 0, tabsClosed: 0, pokes: 0, pets: 0 };
+    this.sessionStart = Date.now();
+    this.front = { app: null, since: Date.now() };
+    this.recentRemarks = [];
+
     this.cursor = { x: workArea.x + workArea.width / 2, y: workArea.y + workArea.height / 2 };
     this.cursorSpeed = 0;
 
@@ -67,7 +73,7 @@ export class Behavior {
     return TIERS[this.tier];
   }
 
-  nextPhrase() {
+  poolDraw() {
     if (this.phraseDeck.length === 0) {
       this.phraseDeck = [...this.phrasePool];
       for (let i = this.phraseDeck.length - 1; i > 0; i--) {
@@ -75,13 +81,63 @@ export class Behavior {
         [this.phraseDeck[i], this.phraseDeck[j]] = [this.phraseDeck[j], this.phraseDeck[i]];
       }
     }
-    return this.renderPhrase(this.phraseDeck.pop());
+    return this.phraseDeck.pop();
+  }
+
+  // Adaptive remarks: candidates are weighted by CURRENT system state — the
+  // frontmost app and how long you've been in it, battery, uptime, cursor
+  // mileage, tabs closed today, day/time, its own mood. The user's phrase
+  // pool stays in rotation as one candidate among them.
+  nextPhrase() {
+    const e = this.env;
+    const mins = this.frontMinutes();
+    const day = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][e.weekday ?? 0];
+    const c = [];
+    const add = (key, w, t) => { if (w > 0 && !this.recentRemarks.includes(key)) c.push({ key, w, t }); };
+
+    if (this.front.app && mins >= 20) add('appDwell', 3, `{appMin} minutes in {app}. I've seen enough.`);
+    if (this.front.app && mins >= 45) add('appDwellLong', 4, `we have lived in {app} for {appMin} minutes. blink twice if you need help.`);
+    if (e.batteryPct != null && !e.charging && e.batteryPct <= 35) add('batt', 3, `{battery}% battery and no charger in sight. thrilling.`);
+    if (e.charging) add('charging', 1.5, `charging. finally, someone listens.`);
+    if (e.uptimeMinutes > 72 * 60) add('uptime', 2, `this machine has been awake {uptimeH} hours. neither of us is okay.`);
+    if (this.stats.tabsClosed > 0) add('kills', 2, `tabs closed on your behalf today: {tabsClosed}. you're welcome.`);
+    if (this.stats.cursorPx > 350000) add('miles', 2.5, `your cursor has traveled {miles} meters today. not once toward me.`);
+    if (e.weekday === 1 && e.hour < 12) add('monday', 2, `monday. even I feel it, and I'm a goose.`);
+    if ((e.weekday === 0 || e.weekday === 6) && e.idleSeconds < 60) add('weekend', 2, `working on a {day}. the pond misses you.`);
+    if (e.hour >= 12 && e.hour < 13) add('lunch', 1.5, `it is lunchtime. you get bread. think of me.`);
+    if (this.tier >= 2) add('mood', 2, `for the record, I have been {tier} for a while now.`);
+    if (Date.now() - this.sessionStart > 3 * 3600_000) add('session', 2, `{sessionMin} minutes together today and not one crumb of bread.`);
+    if (this.stats.pokes > 2) add('pokes', 2, `you have poked me ${this.stats.pokes} times today. I keep records.`);
+    add('pool', 3, null); // the user's own phrase pool
+
+    const total = c.reduce((a, x) => a + x.w, 0);
+    let r = Math.random() * total;
+    let chosen = c[c.length - 1];
+    for (const x of c) { r -= x.w; if (r <= 0) { chosen = x; break; } }
+    this.recentRemarks.push(chosen.key);
+    if (this.recentRemarks.length > 6) this.recentRemarks.shift();
+    return this.renderPhrase(chosen.t == null ? this.poolDraw() : chosen.t);
   }
 
   // Phrase templates: {time} becomes a time 1-3 hours ago, so "honk was sent
   // at {time}. it is now much later." always refers to a real, recent honk.
   renderPhrase(p) {
-    if (typeof p === 'string' && p.includes('{time}')) {
+    if (typeof p !== 'string') return p;
+    const e = this.env;
+    const tokens = {
+      '{battery}': e.batteryPct != null ? String(e.batteryPct) : '??',
+      '{app}': this.front.app || 'that app',
+      '{appMin}': String(this.frontMinutes()),
+      '{miles}': String(Math.round(this.stats.cursorPx / 3780)), // px → ~meters at 96dpi
+      '{tabsClosed}': String(this.stats.tabsClosed),
+      '{uptimeH}': String(Math.round((e.uptimeMinutes || 0) / 60)),
+      '{day}': ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][e.weekday ?? 0],
+      '{sessionMin}': String(Math.round((Date.now() - this.sessionStart) / 60000)),
+      '{idleMin}': String(Math.round((e.idleSeconds || 0) / 60)),
+      '{tier}': this.tierName,
+    };
+    for (const [k, v] of Object.entries(tokens)) p = p.split(k).join(v);
+    if (p.includes('{time}')) {
       const back = 60 + Math.floor(Math.random() * 120);
       let total = this.env.hour * 60 + this.env.minute - back;
       while (total < 0) total += 1440;
@@ -275,14 +331,24 @@ export class Behavior {
     }
   }
 
+  onFrontmost(app) {
+    if (app !== this.front.app) this.front = { app, since: Date.now() };
+  }
+
+  frontMinutes() {
+    return Math.round((Date.now() - this.front.since) / 60000);
+  }
+
   onCursor(p, dt) {
     const d = Math.hypot(p.x - this.cursor.x, p.y - this.cursor.y);
+    this.stats.cursorPx += d;
     this.cursorSpeed = this.cursorSpeed * 0.8 + (d / Math.max(dt, 0.016)) * 0.2;
     if (d > 0.5) this.userIdleT = 0;
     this.cursor = p;
   }
 
   onPoke() {
+    this.stats.pokes++;
     this.meter = clamp(this.meter + 0.08, 0, 1);
     this.anim.poke();
     this.task = null;
@@ -291,6 +357,7 @@ export class Behavior {
   }
 
   onPet() {
+    this.stats.pets++;
     this.meter = clamp(this.meter - 0.28, 0, 1);
     this.task = null;
     this.gapT = 2.5; // stands there, appeased
@@ -657,6 +724,8 @@ export class Behavior {
                 bits.push(`battery ${B.env.batteryPct}%${B.env.charging ? ' (charging)' : ''}.`);
               }
               bits.push(B.env.load1 != null && B.env.load1 > B.env.cpus ? 'computer: struggling.' : 'computer: fine.');
+              if (B.stats.tabsClosed > 0) bits.push(`tabs closed for you: ${B.stats.tabsClosed}.`);
+              if (B.front.app) bits.push(`current obsession: ${B.front.app}.`);
               bits.push('me: unappreciated.');
               B.events.speak(bits.join(' '));
               B.speakCooldown = SPEAK_COOLDOWN * 2;
@@ -749,6 +818,7 @@ export class Behavior {
               if (B.shushed) {
                 // Shushed enforcement still protects focus — wordlessly.
                 B.events.closeDistraction(opts.id);
+                B.stats.tabsClosed++;
                 B.meter = clamp(B.meter - 0.08, 0, 1);
                 phase = 'gloat';
                 return false;
@@ -772,6 +842,7 @@ export class Behavior {
                 peckT -= dt;
                 if (peckT <= 0) {
                   B.events.closeDistraction(opts.id);
+                  B.stats.tabsClosed++;
                   B.meter = clamp(B.meter - 0.08, 0, 1); // enforcement is satisfying
                   B.events.speak(`closed your ${opts.label || 'distraction'}. you're welcome.`);
                   phase = 'gloat';

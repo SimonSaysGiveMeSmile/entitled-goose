@@ -127,10 +127,11 @@ function hostMatches(url, domains) {
 }
 
 export class FocusWarden {
-  constructor({ isEnabled, onDistraction, onPermissionNeeded }) {
+  constructor({ isEnabled, onDistraction, onPermissionNeeded, onFrontmost }) {
     this.isEnabled = isEnabled;
     this.onDistraction = onDistraction;
     this.onPermissionNeeded = onPermissionNeeded;
+    this.onFrontmost = onFrontmost;
     this.blocklist = loadBlocklist();
     this.pending = new Map(); // id → { closer, label }
     this.cooldowns = new Map(); // key → timestamp
@@ -170,7 +171,7 @@ export class FocusWarden {
   }
 
   async poll() {
-    if (!this.isEnabled() || this.pending.size > 0) return;
+    if (this.pending.size > 0) return;
     if (process.platform === 'win32') return this.pollWindows();
     if (process.platform !== 'darwin') return;
 
@@ -178,6 +179,8 @@ export class FocusWarden {
       'tell application "System Events" to get name of first application process whose frontmost is true'
     );
     if (!front || front === 'Electron' || front === 'Entitled Goose') return;
+    if (this.onFrontmost) this.onFrontmost(front);
+    if (!this.isEnabled()) return;
 
     if (this.blocklist.apps.includes(front)) {
       if (this.onCooldown('app:' + front)) return;

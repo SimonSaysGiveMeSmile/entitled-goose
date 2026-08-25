@@ -40,7 +40,7 @@ async function boot() {
   synth.muted = settings.muted;
 
   const events = {
-    honk: (volume) => synth.honk(volume),
+    honk: (volume) => { synth.honk(volume); if (behavior) behavior.stats.honks++; },
     honkVfx: (beak, dir) => vfx.spawnHonk(beak, dir),
     footPlant: (worldX, worldY, dir) => {
       // Angry geese track mud. Content geese are tidy.
@@ -121,6 +121,8 @@ window.goose.on('settings', (s) => {
 window.goose.on('calendar', ({ events }) => behavior && behavior.onCalendar(events));
 
 window.goose.on('menu-pos', (d) => behavior && behavior.onMenuPos(d.item, { x: d.x, y: d.y }));
+
+window.goose.on('frontmost', ({ app }) => behavior && behavior.onFrontmost(app));
 
 window.goose.on('apologize', () => behavior && behavior.onApologize());
 
