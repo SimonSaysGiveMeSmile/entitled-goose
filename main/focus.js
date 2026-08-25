@@ -19,12 +19,13 @@ const DEFAULT_BLOCKLIST = {
   domains: [
     'youtube.com', 'instagram.com', 'tiktok.com', 'netflix.com', 'twitch.tv',
     'reddit.com', 'x.com', 'twitter.com', 'facebook.com', '9gag.com',
-    'hulu.com', 'disneyplus.com', 'primevideo.com', 'snal.com',
+    'hulu.com', 'disneyplus.com', 'primevideo.com', 'snal.com', 'amazon.com',
   ],
   // Matched against window titles when no URL is available (e.g. Firefox).
   titleKeywords: ['youtube', 'instagram', 'netflix', 'twitch', 'tiktok', 'snal'],
   // Whole apps the goose will quit on sight.
   apps: ['TV', 'Netflix', 'Steam'],
+  defaultsVersion: 2,
 };
 
 function osascript(script, timeout = 3000) {
@@ -86,10 +87,27 @@ function blocklistPath() {
   return path.join(app.getPath('userData'), 'blocklist.json');
 }
 
+export function saveBlocklist(list) {
+  try {
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(blocklistPath(), JSON.stringify(list, null, 2));
+  } catch (err) {
+    console.error('blocklist save failed', err);
+  }
+}
+
 export function loadBlocklist() {
   try {
     const data = JSON.parse(fs.readFileSync(blocklistPath(), 'utf8'));
-    return { ...DEFAULT_BLOCKLIST, ...data };
+    const merged = { ...DEFAULT_BLOCKLIST, ...data };
+    // One-time migration: ship newly-added default domains to existing
+    // installs (a saved file otherwise fully shadows the defaults).
+    if ((data.defaultsVersion || 1) < 2) {
+      if (!merged.domains.includes('amazon.com')) merged.domains = [...merged.domains, 'amazon.com'];
+      merged.defaultsVersion = 2;
+      saveBlocklist(merged);
+    }
+    return merged;
   } catch {
     try {
       fs.mkdirSync(app.getPath('userData'), { recursive: true });
@@ -119,6 +137,12 @@ export class FocusWarden {
     this.permissionWarned = false;
     this.nextId = 1;
     this.timer = null;
+  }
+
+  setBlocklist(list) {
+    this.blocklist = list;
+    // Abort in-flight enforcement: its target may have just been unblocked.
+    this.pending.clear();
   }
 
   start() {

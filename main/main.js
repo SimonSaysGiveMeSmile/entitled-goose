@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSettings, saveSettings, loadNotes, saveNotes, notesPath } from './settings.js';
 import { closeAllNotes } from './notes.js';
-import { FocusWarden } from './focus.js';
+import { FocusWarden, loadBlocklist, saveBlocklist } from './focus.js';
 import { openPanel } from './panel.js';
 import { EnvMonitor } from './env.js';
 import { CalendarWatcher } from './calendar.js';
@@ -235,6 +235,7 @@ ipcMain.on('r:goose-state', (_e, s) => { gooseState = s; });
 ipcMain.handle('panel:get', () => ({
   settings,
   phrases: loadNotes(),
+  blocklist: loadBlocklist(),
   meter: gooseState.meter,
   tier: gooseState.tier,
 }));
@@ -252,6 +253,33 @@ ipcMain.on('panel:set-phrases', (_e, phrases) => {
   if (Array.isArray(phrases) && phrases.every((p) => typeof p === 'string')) {
     saveNotes(phrases.slice(0, 200));
   }
+});
+
+ipcMain.on('panel:set-blocklist', (_e, bl) => {
+  // Only lines that already look like a real domain are accepted — half-typed
+  // fragments from the autosave debounce must never become live matchers.
+  const DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
+  const domains = [...new Set((Array.isArray(bl?.domains) ? bl.domains : [])
+    .map((s) => String(s).trim().toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split(/[/?#:]/)[0])
+    .filter((d) => DOMAIN_RE.test(d)))].slice(0, 200);
+  const apps = [...new Set((Array.isArray(bl?.apps) ? bl.apps : [])
+    .map((s) => String(s).trim()).filter(Boolean))].slice(0, 50);
+  // Title-fallback keywords (Firefox + Windows close whole windows on these,
+  // substring-matched): use the registrable label, and only when it is long
+  // enough not to collide with benign titles ("news", "web", "old"...).
+  const TLDISH = new Set(['co', 'com', 'net', 'org', 'ac', 'gov', 'edu']);
+  const titleKeywords = [...new Set(domains.map((d) => {
+    const parts = d.split('.');
+    let label = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+    if (TLDISH.has(label) && parts.length >= 3) label = parts[parts.length - 3];
+    return label;
+  }).filter((k) => k.length >= 5))];
+  const list = { domains, apps, titleKeywords, defaultsVersion: 2 };
+  saveBlocklist(list);
+  if (warden) warden.setBlocklist(list);
 });
 
 ipcMain.on('panel:apologize', () => sendToGoose('apologize', {}));

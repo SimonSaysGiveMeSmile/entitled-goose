@@ -162,6 +162,15 @@
   </div>
 
   <div class="row" style="border: 0; display: block;">
+    <label>Blocked websites <span class="hint">(domains, one per line, up to 200 — incomplete lines are ignored until they look like a domain)</span> <span class="saved" id="saved-bl">saved</span></label>
+    <textarea id="blockDomains" spellcheck="false" style="height: 88px;"></textarea>
+  </div>
+  <div class="row" style="border: 0; display: block; padding-top: 0;">
+    <label>Blocked apps <span class="hint">(exact app names, one per line)</span></label>
+    <textarea id="blockApps" spellcheck="false" style="height: 46px;"></textarea>
+  </div>
+
+  <div class="row" style="border: 0; display: block;">
     <label>Goose phrases <span class="hint">(one per line)</span> <span class="saved" id="saved">saved</span></label>
     <textarea id="phrases" spellcheck="false"></textarea>
   </div>
@@ -187,6 +196,8 @@
     awareness = { battery: true, time: true, reports: true, calendar: false, ...(s.settings.awareness || {}) };
     for (const k of ['battery', 'time', 'reports', 'calendar']) $('aw-' + k).checked = awareness[k];
     $('phrases').value = (s.phrases || []).join('\n');
+    $('blockDomains').value = (s.blocklist?.domains || []).join('\n');
+    $('blockApps').value = (s.blocklist?.apps || []).join('\n');
     updateMeter(s.meter, s.tier);
   }
 
@@ -217,6 +228,26 @@
       setTimeout(() => { $('saved').style.opacity = 0; }, 1200);
     }, 600);
   });
+
+  let blTimer = null;
+  const sendBlocklist = () => {
+    window.panel.setBlocklist({
+      domains: $('blockDomains').value.split('\n').map((l) => l.trim()).filter(Boolean),
+      apps: $('blockApps').value.split('\n').map((l) => l.trim()).filter(Boolean),
+    });
+    $('saved-bl').style.opacity = 1;
+    setTimeout(() => { $('saved-bl').style.opacity = 0; }, 1200);
+  };
+  const saveBlocklist = () => {
+    clearTimeout(blTimer);
+    blTimer = setTimeout(sendBlocklist, 1000);
+  };
+  $('blockDomains').addEventListener('input', saveBlocklist);
+  $('blockApps').addEventListener('input', saveBlocklist);
+  // Flush pending edits when the panel closes or loses focus — the debounce
+  // timer dies with the window otherwise.
+  window.addEventListener('beforeunload', () => { if (blTimer) { clearTimeout(blTimer); sendBlocklist(); } });
+  window.addEventListener('blur', () => { if (blTimer) { clearTimeout(blTimer); blTimer = null; sendBlocklist(); } });
 
   $('apologize').addEventListener('click', () => window.panel.apologize());
 
