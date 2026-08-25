@@ -336,18 +336,20 @@ export class GooseAnimator {
       let dx = intent.lookAt.x - root.x;
       let dy = intent.lookAt.y - root.y;
       const d = Math.hypot(dx, dy) || 1;
-      // Cap short of full chain reach so the neck always keeps some curve
-      // instead of straightening into a stiff pole.
-      const r = clamp(d, 0.30 * S, 0.48 * S);
+      // Ported 1:1 from the landing-page goose: cap short of full reach so
+      // the neck keeps a curve, fine-grained retargeting (14px at default
+      // scale — coarse thresholds make tracking notchy), and the site's
+      // first-order integrator below instead of the second-order spring.
+      const r = clamp(d, 0.18 * S, 0.48 * S);
       let tx = root.x + (dx / d) * r;
       let ty = Math.min(root.y + (dy / d) * r, this.bodyY - 0.16 * S);
-      if (!this.lastLookTarget || Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 34) {
-        // (retarget threshold keeps tracking saccadic, not smooth)
+      if (!this.lastLookTarget || Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 0.082 * S) {
         this.lastLookTarget = { x: tx, y: ty };
       }
       this.headTX = this.lastLookTarget.x;
       this.headTY = this.lastLookTarget.y;
-      snapHalflife = 0.04;
+      this.lookElastic = true;
+      snapHalflife = 0.045;
     } else {
       // Idle: rest pose + occasional saccade glances (birds snap, never smooth-track).
       this.saccadeT -= dt;
@@ -365,8 +367,24 @@ export class GooseAnimator {
       this.headAnchorX = restX;
     }
 
-    [this.headWX, this.headVX] = springDamp(this.headWX, this.headVX, this.headTX, snapHalflife, dt);
-    [this.headWY, this.headVY] = springDamp(this.headWY, this.headVY, this.headTY, snapHalflife, dt);
+    if (this.lookElastic) {
+      // The landing page's exact head dynamics: first-order exponential with
+      // a 45ms halflife (k = 1 − 2^(−dt/0.045)) — taut elastic follow, no
+      // second-order lag or overshoot. Velocity is kept coherent so handing
+      // back to the spring branches never pops.
+      const k = 1 - Math.pow(2, -dt / 0.045);
+      const px = this.headWX;
+      const py = this.headWY;
+      this.headWX += (this.headTX - this.headWX) * k;
+      this.headWY += (this.headTY - this.headWY) * k;
+      const inv = 1 / Math.max(dt, 1e-4);
+      this.headVX = (this.headWX - px) * inv;
+      this.headVY = (this.headWY - py) * inv;
+      this.lookElastic = false;
+    } else {
+      [this.headWX, this.headVX] = springDamp(this.headWX, this.headVX, this.headTX, snapHalflife, dt);
+      [this.headWY, this.headVY] = springDamp(this.headWY, this.headVY, this.headTY, snapHalflife, dt);
+    }
 
     // ---- Beak / blink / breath / tail / faceCamera ----
     [this.beakOpen, this.beakV] = springDamp(this.beakOpen, this.beakV, beakTarget, 0.03, dt);
