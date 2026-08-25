@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell, nativeImage, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadSettings, saveSettings, loadNotes, notesPath } from './settings.js';
-import { spawnNote, closeAllNotes } from './notes.js';
+import { loadSettings, saveSettings, loadNotes, saveNotes, notesPath } from './settings.js';
+import { closeAllNotes } from './notes.js';
 import { FocusWarden } from './focus.js';
+import { openPanel } from './panel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,13 +13,10 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const WIN_W = 660;
 const WIN_H = 540;
-const MOVE_QUANTUM = 16; // coarse reposition steps (px)
-const MOVE_MIN_INTERVAL = 33; // ≤30 Hz window moves
 
 let win = null;
 let tray = null;
 let settings = loadSettings();
-let lastMoveAt = 0;
 let quitting = false;
 let warden = null;
 
@@ -28,11 +26,6 @@ if (!app.requestSingleInstanceLock()) {
 
 function workArea() {
   return screen.getPrimaryDisplay().workArea;
-}
-
-function windowY() {
-  const wa = workArea();
-  return wa.y + wa.height - WIN_H;
 }
 
 function applyOverlayFlags() {
@@ -50,7 +43,7 @@ function createWindow() {
   const wa = workArea();
   win = new BrowserWindow({
     x: Math.round(wa.x + wa.width / 2 - WIN_W / 2),
-    y: windowY(),
+    y: wa.y + wa.height - WIN_H,
     width: WIN_W,
     height: WIN_H,
     transparent: true,
@@ -84,21 +77,17 @@ function createWindow() {
   });
 }
 
-function repositionForGoose(gooseX) {
+// The RENDERER owns follow decisions: it updates its drawing origin and orders
+// the window move in the same frame, so the goose never draws against a stale
+// origin (that mismatch showed up as intermittent flicker, worst on vertical
+// walks). Main just executes the move verbatim — clamped for safety, never
+// re-quantized, or the two sides would disagree.
+function moveWindowTo(x, y) {
   if (!win || win.isDestroyed()) return;
-  const now = Date.now();
-  if (now - lastMoveAt < MOVE_MIN_INTERVAL) return;
   const wa = workArea();
-  const bounds = win.getBounds();
-  const margin = 210; // deadzone: goose can roam this far from window center
-  const centerX = bounds.x + WIN_W / 2;
-  if (Math.abs(gooseX - centerX) <= margin && bounds.y === windowY()) return;
-
-  let targetX = Math.round((gooseX - WIN_W / 2) / MOVE_QUANTUM) * MOVE_QUANTUM;
-  targetX = Math.min(Math.max(targetX, wa.x), wa.x + wa.width - WIN_W);
-  win.setBounds({ x: targetX, y: windowY(), width: WIN_W, height: WIN_H });
-  lastMoveAt = now;
-  sendToGoose('window-moved', win.getBounds());
+  const cx = Math.min(Math.max(Math.round(x), wa.x), wa.x + wa.width - WIN_W);
+  const cy = Math.min(Math.max(Math.round(y), wa.y), wa.y + wa.height - WIN_H);
+  win.setBounds({ x: cx, y: cy, width: WIN_W, height: WIN_H });
 }
 
 function buildTray() {
@@ -107,10 +96,15 @@ function buildTray() {
   tray = new Tray(icon);
   if (process.platform === 'darwin') tray.setTitle('🪿');
   tray.setToolTip('Entitled Goose');
-  const rebuild = () => {
-    tray.setContextMenu(Menu.buildFromTemplate([
+  buildTrayMenu();
+}
+
+function buildTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Entitled Goose', enabled: false },
       { type: 'separator' },
+      { label: 'Control panel…', click: () => openPanel() },
       {
         label: 'Apologize to the goose',
         click: () => sendToGoose('apologize', {}),
@@ -145,7 +139,7 @@ function buildTray() {
           saveSettings(settings);
         },
       },
-      { label: 'Edit notes…', click: () => { loadNotes(); shell.openPath(notesPath()); } },
+      { label: 'Edit goose phrases…', click: () => { loadNotes(); shell.openPath(notesPath()); } },
       { type: 'separator' },
       {
         label: 'About',
@@ -163,9 +157,7 @@ function buildTray() {
           app.quit();
         },
       },
-    ]));
-  };
-  rebuild();
+  ]));
 }
 
 app.whenReady().then(() => {
@@ -191,37 +183,49 @@ app.whenReady().then(() => {
   warden = new FocusWarden({
     isEnabled: () => settings.focusEnforce,
     onDistraction: (d) => sendToGoose('distraction', d),
-    onPermissionNeeded: () => {
-      const wa = workArea();
-      spawnNote(
-        'I tried to close your youtube but the computer says I need permission. System Settings → Privacy → Automation. fix it.',
-        wa.x + wa.width / 2,
-        wa.y + wa.height / 2
-      );
-    },
+    onPermissionNeeded: () => sendToGoose('speak', {
+      text: 'I tried to close your youtube but the computer says I need permission. System Settings → Privacy → Automation. fix it.',
+    }),
   });
   warden.start();
 });
 
-ipcMain.on('r:goose-pos', (_e, { x }) => repositionForGoose(x));
+ipcMain.on('r:move-window', (_e, { x, y }) => moveWindowTo(x, y));
+
+let gooseState = { meter: 0.15, tier: 'content' };
+ipcMain.on('r:goose-state', (_e, s) => { gooseState = s; });
+
+// ---- Control panel ----
+ipcMain.handle('panel:get', () => ({
+  settings,
+  phrases: loadNotes(),
+  meter: gooseState.meter,
+  tier: gooseState.tier,
+}));
+
+ipcMain.on('panel:set', (_e, partial) => {
+  const politeBefore = settings.polite;
+  Object.assign(settings, partial);
+  saveSettings(settings);
+  if (settings.polite !== politeBefore) applyOverlayFlags();
+  sendToGoose('settings', settings);
+  buildTrayMenu();
+});
+
+ipcMain.on('panel:set-phrases', (_e, phrases) => {
+  if (Array.isArray(phrases) && phrases.every((p) => typeof p === 'string')) {
+    saveNotes(phrases.slice(0, 200));
+  }
+});
+
+ipcMain.on('panel:apologize', () => sendToGoose('apologize', {}));
 
 ipcMain.on('r:click-through', (_e, { enable }) => {
   if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(enable, { forward: true });
 });
 
-ipcMain.on('r:spawn-note', (_e, { text, x, y }) => {
-  const notes = loadNotes();
-  const chosen = text || notes[Math.floor(Math.random() * notes.length)];
-  spawnNote(chosen, x, y);
-});
-
 ipcMain.on('r:distraction-close', async (_e, { id }) => {
-  if (!warden) return;
-  const label = await warden.close(id);
-  if (label && Math.random() < 0.6) {
-    const wa = workArea();
-    spawnNote(`closed your ${label}. you're welcome.`, wa.x + wa.width / 2, wa.y + wa.height * 0.4);
-  }
+  if (warden) await warden.close(id); // the goose announces the kill via its bubble
 });
 
 ipcMain.handle('r:get-state', () => {
@@ -234,6 +238,7 @@ ipcMain.handle('r:get-state', () => {
     workArea: workArea(),
     windowBounds: win ? win.getBounds() : null,
     settings,
+    phrases: loadNotes(),
     grudgePending: grudge,
   };
 });

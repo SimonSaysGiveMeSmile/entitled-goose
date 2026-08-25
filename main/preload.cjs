@@ -1,9 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const SEND_CHANNELS = new Set([
-  'goose-pos',
+  'move-window',
+  'goose-state',
   'click-through',
-  'spawn-note',
   'honked',
   'distraction-close',
 ]);
@@ -14,6 +14,7 @@ const ON_CHANNELS = new Set([
   'settings',
   'apologize',
   'distraction',
+  'speak',
 ]);
 
 contextBridge.exposeInMainWorld('goose', {

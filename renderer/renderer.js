@@ -2,6 +2,7 @@ import { GooseAnimator } from './goose/animator.js';
 import { Behavior } from './goose/behavior.js';
 import { HonkSynth } from './goose/audio.js';
 import { Vfx } from './goose/vfx.js';
+import { SpeechBubble } from './goose/bubble.js';
 import { drawGoose } from './goose/draw.js';
 
 const canvas = document.getElementById('stage');
@@ -12,16 +13,12 @@ let workArea = null;
 let settings = { muted: false, polite: false, scale: 170 };
 let cursor = { x: 0, y: 0 };
 let clickable = false;
-let lastCursorAt = performance.now();
 
 const synth = new HonkSynth();
 const vfx = new Vfx();
 let animator = null;
 let behavior = null;
-
-function groundY() {
-  return workArea.y + workArea.height - 4;
-}
+let bubble = null;
 
 function fitCanvas() {
   const dpr = window.devicePixelRatio || 1;
@@ -45,27 +42,34 @@ async function boot() {
   const events = {
     honk: (volume) => synth.honk(volume),
     honkVfx: (beak, dir) => vfx.spawnHonk(beak, dir),
-    footPlant: (worldX, dir) => {
+    footPlant: (worldX, worldY, dir) => {
       // Angry geese track mud. Content geese are tidy.
-      if (behavior && behavior.tier >= 3) vfx.stampFoot(worldX, groundY(), dir);
+      if (behavior && behavior.tier >= 3) vfx.stampFoot(worldX, worldY, dir);
     },
   };
-  animator = new GooseAnimator({ scale: settings.scale, groundY: groundY(), workArea, events });
+  animator = new GooseAnimator({
+    scale: settings.scale,
+    groundY: workArea.y + workArea.height - 4,
+    workArea,
+    events,
+  });
+  bubble = new SpeechBubble(() => {
+    const head = animator.headWorld();
+    return { x: head.x, y: head.y, facing: animator.facing };
+  });
   behavior = new Behavior({
     animator,
     workArea,
     polite: settings.polite,
+    phrases: state.phrases || [],
     events: {
-      spawnNote: (text, beak) => {
-        const b = beak || animator.beakWorld();
-        window.goose.send('spawn-note', { text, x: b.x, y: b.y });
-      },
+      speak: (text) => bubble.say(text),
       closeDistraction: (id) => window.goose.send('distraction-close', { id }),
     },
   });
 
   if (state.grudgePending) {
-    setTimeout(() => behavior && behavior.deliverGrudgeNote(), 8000);
+    setTimeout(() => behavior && behavior.deliverGrudge(), 8000);
   }
 
   requestAnimationFrame(frame);
@@ -79,7 +83,6 @@ window.goose.on('work-area', (wa) => {
   workArea = wa;
   if (animator) {
     animator.workArea = wa;
-    animator.groundY = groundY();
     behavior.workArea = wa;
   }
 });
@@ -88,11 +91,14 @@ window.goose.on('settings', (s) => {
   settings = { ...settings, ...s };
   synth.muted = settings.muted;
   if (behavior) behavior.polite = settings.polite;
+  if (animator && settings.scale) animator.S = settings.scale;
 });
 
 window.goose.on('apologize', () => behavior && behavior.onApologize());
 
 window.goose.on('distraction', (d) => behavior && behavior.enforce(d));
+
+window.goose.on('speak', ({ text }) => bubble && bubble.say(text));
 
 let lastCursor = null;
 let lastCursorTime = 0;
@@ -134,15 +140,45 @@ window.addEventListener('pointerup', () => {
   downAt = null;
 });
 
+// ---- Window follow (renderer-owned to avoid stale-origin flicker) ----
+// The drawing origin updates in the SAME frame the move is ordered, so the
+// goose never draws against a window position it doesn't have yet. Coarse
+// quantized steps keep moves infrequent.
+const WIN_W = 660;
+const WIN_H = 540;
+const FOLLOW_QUANTUM = 64;
+
+function followWindow() {
+  const anchorX = origin.x + WIN_W / 2;
+  const anchorY = origin.y + WIN_H * 0.72;
+  if (Math.abs(animator.bodyX - anchorX) <= 200 && Math.abs(animator.bodyY - anchorY) <= 105) return;
+  const q = FOLLOW_QUANTUM;
+  let tx = Math.round((animator.bodyX - WIN_W / 2) / q) * q;
+  let ty = Math.round((animator.bodyY - WIN_H * 0.72) / q) * q;
+  tx = Math.min(Math.max(tx, workArea.x), workArea.x + workArea.width - WIN_W);
+  ty = Math.min(Math.max(ty, workArea.y), workArea.y + workArea.height - WIN_H);
+  if (tx !== origin.x || ty !== origin.y) {
+    origin = { x: tx, y: ty };
+    window.goose.send('move-window', { x: tx, y: ty });
+  }
+}
+
 // ---- Main loop with a watchdog for rAF throttling ----
 
 let lastFrame = performance.now();
+let stateReportT = 0;
 
 function step(dt) {
   const intent = behavior.update(dt);
   const state = animator.update(dt, intent, cursor);
   vfx.update(dt);
-  window.goose.send('goose-pos', { x: animator.bodyX });
+  bubble.update(dt, ctx);
+  followWindow();
+  stateReportT -= dt;
+  if (stateReportT <= 0) {
+    stateReportT = 0.5;
+    window.goose.send('goose-state', { meter: behavior.meter, tier: behavior.tierName });
+  }
   return state;
 }
 
@@ -161,14 +197,15 @@ function frame(now) {
   ctx.translate(-origin.x, -origin.y);
   vfx.drawFootprints(ctx);
 
-  // Goose local space: origin at ground under body, height 1.0, faces +x.
+  // Goose local space: origin at the foot line under the body, height 1.0, faces +x.
   ctx.save();
-  ctx.translate(state.bodyX, groundY());
+  ctx.translate(state.bodyX, state.bodyY);
   ctx.scale(settings.scale * state.facing, settings.scale);
   drawGoose(ctx, state);
   ctx.restore();
 
   vfx.drawHonkLines(ctx);
+  bubble.draw(ctx);
   ctx.restore();
 
   requestAnimationFrame(frame);

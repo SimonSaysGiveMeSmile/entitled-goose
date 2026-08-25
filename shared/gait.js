@@ -29,9 +29,11 @@ export class Gait {
     for (const f of this.feet) { f.lift = 0; f.planted = true; }
   }
 
-  // bodyX: current body world x. speed: |px-equivalent| in local units/s. dir: ±1.
-  // Returns plant events (world x per newly planted foot) for footprint stamping.
-  update(dt, bodyX, speed, dir) {
+  // bodyX: current body world x. speed: total gait cadence speed (local units/s).
+  // dir: ±1. plantSpeed: horizontal component of speed — when the goose moves
+  // mostly vertically, feet step in place under the body instead of marching
+  // ahead of it. Returns plant events (world x per newly planted foot).
+  update(dt, bodyX, speed, dir, plantSpeed = speed) {
     const plantEvents = [];
     const wasMoving = this.moving;
     this.moving = speed > 0.01;
@@ -65,7 +67,9 @@ export class Gait {
           f.swingFrom = f.x;
           // Plant ahead of where the body will be when the foot lands.
           const landTime = SWING_FRAC / freq;
-          f.swingTo = bodyX + dir * (this.stepLength * 0.5) + dir * speed * landTime * 0.5;
+          const plantFactor = Math.min(1, Math.max(0, plantSpeed / Math.max(speed, 1e-6)));
+          f.swingTo = bodyX + dir * (this.stepLength * 0.5 * plantFactor)
+            + dir * plantSpeed * landTime * 0.5;
         }
         const ease = t * t * (3 - 2 * t);
         f.x = f.swingFrom + (f.swingTo - f.swingFrom) * ease;

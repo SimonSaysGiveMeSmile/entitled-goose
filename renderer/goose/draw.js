@@ -15,7 +15,7 @@ export const PALETTE = {
 };
 
 export const GEO = {
-  neckRoot: { x: 0.15, y: -0.41 },
+  neckRoot: { x: 0.165, y: -0.40 },
   neckSegments: 5,
   neckLength: 0.52,
   headRx: 0.075,
@@ -43,16 +43,17 @@ export function neckRestPose(bodyDY = 0) {
 }
 
 function bodyPath(ctx, dy, tailWag) {
-  // Fat teardrop: deep chest front-bottom sweeping up to a pointed tail spike.
-  const ty = -0.545 + dy + tailWag;
+  // Long, low teardrop: deep chest front-bottom, near-horizontal back sweeping
+  // up to a sharp raised tail spike — the #2 silhouette identifier.
+  const ty = -0.575 + dy + tailWag;
   ctx.beginPath();
-  ctx.moveTo(0.155, -0.425 + dy); // neck root shoulder
-  ctx.bezierCurveTo(0.245, -0.415 + dy, 0.300, -0.340 + dy, 0.290, -0.255 + dy); // chest
-  ctx.bezierCurveTo(0.280, -0.155 + dy, 0.185, -0.105 + dy, 0.050, -0.105 + dy); // belly front
-  ctx.bezierCurveTo(-0.075, -0.105 + dy, -0.185, -0.135 + dy, -0.240, -0.205 + dy); // belly rear
-  ctx.bezierCurveTo(-0.300, -0.285 + dy, -0.345, -0.435 + dy, -0.375, ty); // under-tail to spike
-  ctx.bezierCurveTo(-0.290, -0.500 + dy, -0.175, -0.470 + dy, -0.045, -0.465 + dy); // back
-  ctx.bezierCurveTo(0.035, -0.462 + dy, 0.105, -0.448 + dy, 0.155, -0.425 + dy); // to shoulder
+  ctx.moveTo(0.175, -0.415 + dy); // neck root shoulder
+  ctx.bezierCurveTo(0.280, -0.405 + dy, 0.330, -0.330 + dy, 0.318, -0.240 + dy); // chest
+  ctx.bezierCurveTo(0.305, -0.145 + dy, 0.195, -0.100 + dy, 0.045, -0.100 + dy); // belly front
+  ctx.bezierCurveTo(-0.095, -0.100 + dy, -0.225, -0.130 + dy, -0.285, -0.200 + dy); // belly rear
+  ctx.bezierCurveTo(-0.345, -0.270 + dy, -0.400, -0.470 + dy, -0.430, ty); // under-tail to spike tip
+  ctx.bezierCurveTo(-0.330, -0.508 + dy, -0.205, -0.462 + dy, -0.060, -0.450 + dy); // back (near-flat)
+  ctx.bezierCurveTo(0.040, -0.443 + dy, 0.120, -0.432 + dy, 0.175, -0.415 + dy); // to shoulder
   ctx.closePath();
 }
 
@@ -102,7 +103,7 @@ function drawNeck(ctx, pts, color) {
     const len = Math.hypot(tx, ty) || 1;
     tx /= len; ty /= len;
     const u = i / (n - 1);
-    const hw = (0.078 - 0.020 * u) * 0.5; // taper base → head
+    const hw = (0.072 - 0.018 * u) * 0.5; // taper base → head
     left.push({ x: p.x - ty * hw, y: p.y + tx * hw });
     right.push({ x: p.x + ty * hw, y: p.y - tx * hw });
   }
@@ -144,8 +145,8 @@ function drawHead(ctx, head, opts) {
   ctx.translate(head.x, head.y);
   ctx.rotate(angle);
 
-  const beakLen = 0.115 * (1 - 0.55 * faceCamera);
-  const bx = 0.045; // beak root x relative to head center
+  const beakLen = 0.125 * (1 - 0.40 * faceCamera);
+  const bx = 0.042; // beak root x relative to head center
 
   // Open-mouth interior (visible only when beak opens).
   if (beakOpen > 0.05) {
@@ -164,9 +165,11 @@ function drawHead(ctx, head, opts) {
   ctx.translate(bx, -0.004);
   ctx.rotate(-beakOpen * 0.42);
   ctx.beginPath();
-  ctx.moveTo(-0.012, -0.026);
-  ctx.quadraticCurveTo(beakLen * 0.72, -0.030, beakLen, 0.004);
-  ctx.quadraticCurveTo(beakLen * 0.7, 0.013, -0.012, 0.012);
+  // Flatter goose bill: nearly straight top line, blunt rounded tip.
+  ctx.moveTo(-0.012, -0.022);
+  ctx.quadraticCurveTo(beakLen * 0.70, -0.024, beakLen * 0.96, -0.008);
+  ctx.quadraticCurveTo(beakLen * 1.04, 0.002, beakLen * 0.92, 0.010);
+  ctx.quadraticCurveTo(beakLen * 0.6, 0.015, -0.012, 0.012);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -186,23 +189,26 @@ function drawHead(ctx, head, opts) {
   ctx.restore();
   ctx.fillStyle = PALETTE.body;
   ctx.beginPath();
-  ctx.ellipse(-0.012, -0.006, 0.078 * (1 + 0.06 * faceCamera), 0.062, 0, 0, Math.PI * 2);
+  // Smaller egg-shaped head, long axis horizontal ("real goose, not mascot").
+  ctx.ellipse(-0.014, -0.006, 0.072 * (1 + 0.06 * faceCamera), 0.056, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eye(s): tiny dot, high and forward, no highlight.
-  const eyeY = -0.020;
+  // Eye(s): tiny dot, high and forward, no highlight — all expressiveness
+  // lives in the pose, none in the face.
+  const eyeY = -0.022;
   const drawEye = (ex) => {
     ctx.fillStyle = PALETTE.eye;
     if (eyelid > 0.6) {
-      ctx.fillRect(ex - 0.010, eyeY - 0.001, 0.020, 0.003); // flat closed-eye line
+      ctx.fillRect(ex - 0.008, eyeY - 0.001, 0.016, 0.003); // flat closed-eye line
     } else {
       ctx.beginPath();
-      ctx.arc(ex, eyeY, 0.0115, 0, Math.PI * 2);
+      ctx.arc(ex, eyeY, 0.0085, 0, Math.PI * 2);
       ctx.fill();
     }
   };
-  drawEye(0.012 - 0.020 * faceCamera);
-  if (faceCamera > 0.35) drawEye(-0.052);
+  // Single eye always — a two-eyed frontal goose is lowkey creepy. The ¾ turn
+  // reads through the foreshortened beak instead.
+  drawEye(0.014 - 0.020 * faceCamera);
   ctx.restore();
 }
 

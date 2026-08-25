@@ -25,12 +25,13 @@ const HONK_SOUND_T = 0.18;
 export class GooseAnimator {
   constructor({ scale, groundY, workArea, events }) {
     this.S = scale;
-    this.groundY = groundY;
     this.workArea = workArea;
-    this.events = events; // { honk(volume), honkVfx(beakWorld, dir), footPlant(worldX) }
+    this.events = events; // { honk(volume), honkVfx(beakWorld, dir), footPlant(worldX, worldY, dir) }
 
     this.bodyX = workArea.x + workArea.width / 2;
+    this.bodyY = groundY; // the goose's foot line — it roams the whole screen
     this.vx = 0;
+    this.vy = 0;
     this.facing = 1;
     this.arrived = true;
 
@@ -43,7 +44,7 @@ export class GooseAnimator {
 
     // Head target in world px, with snap spring.
     this.headWX = this.bodyX + GEO.restHead.x * this.S;
-    this.headWY = groundY + GEO.restHead.y * this.S;
+    this.headWY = this.bodyY + GEO.restHead.y * this.S;
     this.headVX = 0;
     this.headVY = 0;
     this.headTX = this.headWX;
@@ -107,35 +108,53 @@ export class GooseAnimator {
     const S = this.S;
     return {
       x: this.bodyX - 0.42 * S,
-      y: this.groundY - 1.02 * S,
+      y: this.bodyY - 1.02 * S,
       w: 0.84 * S,
       h: 1.04 * S,
     };
   }
 
-  // intent: { move: x|null, speedTier, lookAt: {x,y}|null, faceCamera, showBubble, sleep }
+  minBodyY() {
+    return this.workArea.y + 1.08 * this.S;
+  }
+
+  maxBodyY() {
+    return this.workArea.y + this.workArea.height - 4;
+  }
+
+  // intent: { move: {x, y|null}|null, speedTier, lookAt: {x,y}|null, faceCamera, showBubble, sleep }
   update(dt, intent, cursor) {
     const S = this.S;
 
-    // ---- Locomotion ----
+    // ---- Locomotion (free 2D roaming) ----
     let speed = 0;
-    if (intent.move != null && Math.abs(intent.move - this.bodyX) > 6) {
+    let hSpeed = 0;
+    const mv = intent.move;
+    const dx = mv != null ? mv.x - this.bodyX : 0;
+    const dy = mv != null && mv.y != null ? mv.y - this.bodyY : 0;
+    const dist = Math.hypot(dx, dy);
+    if (mv != null && dist > 6) {
       this.arrived = false;
-      const dx = intent.move - this.bodyX;
-      const dir = Math.sign(dx);
       const maxSpeed = SPEEDS[intent.speedTier || 'walk'];
       // Arrive: slow down inside the stopping radius.
-      const target = Math.min(maxSpeed, Math.abs(dx) * 3.2);
-      this.vx += clamp(dir * target - this.vx, -ACCEL * dt, ACCEL * dt);
-      this.facing = dir || this.facing;
+      const target = Math.min(maxSpeed, dist * 3.2);
+      const tvx = (dx / dist) * target;
+      const tvy = (dy / dist) * target;
+      this.vx += clamp(tvx - this.vx, -ACCEL * dt, ACCEL * dt);
+      this.vy += clamp(tvy - this.vy, -ACCEL * dt, ACCEL * dt);
+      if (Math.abs(this.vx) > 20) this.facing = Math.sign(this.vx);
     } else {
       this.arrived = true;
       this.vx += clamp(0 - this.vx, -ACCEL * dt, ACCEL * dt);
+      this.vy += clamp(0 - this.vy, -ACCEL * dt, ACCEL * dt);
     }
     this.bodyX += this.vx * dt;
+    this.bodyY += this.vy * dt;
     const margin = 0.45 * S;
     this.bodyX = clamp(this.bodyX, this.workArea.x + margin, this.workArea.x + this.workArea.width - margin);
-    speed = Math.abs(this.vx);
+    this.bodyY = clamp(this.bodyY, this.minBodyY(), this.maxBodyY());
+    speed = Math.hypot(this.vx, this.vy);
+    hSpeed = Math.abs(this.vx);
 
     // Face the point of interest when standing still.
     if (this.arrived && !intent.faceCamera) {
@@ -146,8 +165,10 @@ export class GooseAnimator {
     }
 
     // ---- Gait (local units) ----
-    const plants = this.gait.update(dt, this.bodyX / S, speed / S, this.facing);
-    for (const px of plants) this.events.footPlant(px * S, this.facing);
+    // Cadence follows total speed; plant distance follows horizontal speed, so
+    // a vertically-walking goose steps in place under its body.
+    const plants = this.gait.update(dt, this.bodyX / S, speed / S, this.facing, hSpeed / S);
+    for (const px of plants) this.events.footPlant(px * S, this.bodyY, this.facing);
 
     // ---- Sleep settle ----
     const sleepTarget = intent.sleep ? 1 : 0;
@@ -174,13 +195,13 @@ export class GooseAnimator {
 
     // ---- Head target selection ----
     const restX = this.bodyX + this.facing * GEO.restHead.x * S;
-    const restY = this.groundY + GEO.restHead.y * S;
+    const restY = this.bodyY + GEO.restHead.y * S;
     let snapHalflife = 0.22;
 
     if (this.sleepAmt > 0.5) {
       // Tucked along the back.
       this.headTX = this.bodyX - this.facing * 0.06 * S;
-      this.headTY = this.groundY - 0.46 * S;
+      this.headTY = this.bodyY - 0.46 * S;
       snapHalflife = 0.35;
     } else if (this.action && extend > 0) {
       // Honk: anticipation pull-back, then extend toward the target.
@@ -214,13 +235,13 @@ export class GooseAnimator {
       snapHalflife = 0.06;
     } else if (intent.lookAt) {
       // Saccadic cursor tracking: retarget only on meaningful movement, then snap.
-      const root = { x: this.bodyX + this.facing * GEO.neckRoot.x * S, y: this.groundY + GEO.neckRoot.y * S };
+      const root = { x: this.bodyX + this.facing * GEO.neckRoot.x * S, y: this.bodyY + GEO.neckRoot.y * S };
       let dx = intent.lookAt.x - root.x;
       let dy = intent.lookAt.y - root.y;
       const d = Math.hypot(dx, dy) || 1;
       const r = clamp(d, 0.30 * S, 0.55 * S);
       let tx = root.x + (dx / d) * r;
-      let ty = Math.min(root.y + (dy / d) * r, this.groundY - 0.16 * S);
+      let ty = Math.min(root.y + (dy / d) * r, this.bodyY - 0.16 * S);
       if (!this.lastLookTarget || Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 34) {
         this.lastLookTarget = { x: tx, y: ty };
       }
@@ -263,7 +284,7 @@ export class GooseAnimator {
     const bodyDY = this.gait.bob + squash * 0.035 + this.sleepAmt * 0.095 - Math.sin(this.breathT * 3.1) * 0.004;
     const root = { x: GEO.neckRoot.x, y: GEO.neckRoot.y + bodyDY };
     const localTX = ((this.headWX - this.bodyX) / S) * this.facing;
-    const localTY = (this.headWY - this.groundY) / S;
+    const localTY = (this.headWY - this.bodyY) / S;
     this.neckPts[0].x = root.x;
     this.neckPts[0].y = root.y;
     solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
@@ -281,6 +302,7 @@ export class GooseAnimator {
 
     return {
       bodyX: this.bodyX,
+      bodyY: this.bodyY,
       facing: this.facing,
       bodyDY,
       roll: this.gait.roll,

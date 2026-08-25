@@ -1,7 +1,8 @@
 // The goose's mind: a weighted shuffle-deck task picker modulated by the
 // Entitlement Meter (Content → Miffed → Indignant → Wrath). The meter rises
 // while the goose is ignored and falls when it is acknowledged; it scales honk
-// volume/frequency and unlocks the pushier tasks.
+// volume/frequency and unlocks the pushier tasks. The goose roams the whole
+// screen (2D move targets) and talks via a speech bubble that follows it.
 
 import { clamp } from '../../shared/spring.js';
 
@@ -15,25 +16,30 @@ const WEIGHTS = {
   honk:   [0.05, 0.15, 0.22, 0.30],
   stare:  [0.10, 0.14, 0.18, 0.15],
   demand: [0.00, 0.04, 0.18, 0.30],
-  note:   [0.05, 0.14, 0.14, 0.10],
+  speak:  [0.05, 0.14, 0.14, 0.10],
 };
 const HONK_VOLUME = [0.40, 0.55, 0.75, 1.0];
-const NOTE_COOLDOWN = 45;
+const SPEAK_COOLDOWN = 30;
 
 export class Behavior {
-  constructor({ animator, workArea, events, polite = false }) {
+  constructor({ animator, workArea, events, phrases = [], polite = false }) {
     this.anim = animator;
     this.workArea = workArea;
-    this.events = events; // { spawnNote(text|null), honkSound-> via animator }
+    // events: { speak(text), closeDistraction(id) }
+    this.events = events;
     this.polite = polite;
 
     this.meter = 0.15;
     this.task = null;
     this.lastTaskName = null;
     this.gapT = 1.5;
-    this.noteCooldown = 10;
+    this.speakCooldown = 8;
     this.visitCooldown = 0;
     this.userIdleT = 0;
+
+    // Shuffle-deck of phrases: no repeats until the whole pool has been used.
+    this.phrasePool = phrases.length ? phrases : ['honk.'];
+    this.phraseDeck = [];
 
     this.cursor = { x: workArea.x + workArea.width / 2, y: workArea.y + workArea.height / 2 };
     this.cursorSpeed = 0;
@@ -49,6 +55,22 @@ export class Behavior {
     return TIERS[this.tier];
   }
 
+  nextPhrase() {
+    if (this.phraseDeck.length === 0) {
+      this.phraseDeck = [...this.phrasePool];
+      for (let i = this.phraseDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.phraseDeck[i], this.phraseDeck[j]] = [this.phraseDeck[j], this.phraseDeck[i]];
+      }
+    }
+    return this.phraseDeck.pop();
+  }
+
+  gooseDistToCursor() {
+    const b = this.anim;
+    return Math.hypot(this.cursor.x - b.bodyX, this.cursor.y - (b.bodyY - b.S * 0.5));
+  }
+
   onCursor(p, dt) {
     const d = Math.hypot(p.x - this.cursor.x, p.y - this.cursor.y);
     this.cursorSpeed = this.cursorSpeed * 0.8 + (d / Math.max(dt, 0.016)) * 0.2;
@@ -61,38 +83,39 @@ export class Behavior {
     this.anim.poke();
     this.task = null;
     this.gapT = 1.0;
+    if (this.tier >= 2) this.events.speak('excuse me??');
   }
 
   onPet() {
     this.meter = clamp(this.meter - 0.28, 0, 1);
     this.task = null;
-    this.gapT = 2.5; // stands there, appeased, eye closed handled by renderer
+    this.gapT = 2.5; // stands there, appeased
+    if (Math.random() < 0.4) this.events.speak('hm. acceptable.');
   }
 
   onApologize() {
     this.meter = 0;
-    setTimeout(() => this.events.spawnNote('I forgive you. (for what you did.)'), 3000);
+    setTimeout(() => this.events.speak('I forgive you. (for what you did.)'), 2500);
   }
 
-  deliverGrudgeNote() {
-    this.task = this.makeTask('note', { text: 'I noticed you tried to evict me. bold.' });
+  deliverGrudge() {
+    this.events.speak('I noticed you tried to evict me. bold.');
+    this.meter = clamp(this.meter + 0.2, 0, 1);
   }
 
-  // A distraction was spotted (m:distraction). This preempts whatever the
-  // goose was doing: sprint to the offending window, honk it down, and only
-  // then does the main process actually close it.
+  // A distraction was spotted: sprint over, honk it down, then main closes it.
   enforce({ id, label, x }) {
     this.task = this.makeTask('enforce', { id, label, x });
     this.gapT = 0;
   }
 
   update(dt) {
-    this.noteCooldown -= dt;
+    this.speakCooldown -= dt;
     this.visitCooldown -= dt;
     this.userIdleT += dt;
 
     // ---- Entitlement meter dynamics ----
-    const gooseDist = Math.hypot(this.cursor.x - this.anim.bodyX, this.cursor.y - this.anim.groundY + this.anim.S * 0.5);
+    const gooseDist = this.gooseDistToCursor();
     const rate = this.polite ? 0.5 : 1;
     if (this.cursorSpeed > 60 && gooseDist > 350) {
       this.meter += 0.014 * rate * dt; // actively ignoring the goose
@@ -120,7 +143,6 @@ export class Behavior {
       this.intent.lookAt = gooseDist < 330 ? this.cursor : null;
       if (this.gapT <= 0 && !this.anim.busy) {
         this.task = this.pickTask();
-        this.task.start?.();
       }
     }
 
@@ -141,7 +163,7 @@ export class Behavior {
     const entries = Object.entries(WEIGHTS)
       .map(([name, w]) => [name, name === this.lastTaskName ? w[t] * 0.25 : w[t]])
       .filter(([name, w]) => w > 0 && !(this.polite && name === 'demand'))
-      .filter(([name]) => name !== 'note' || this.noteCooldown <= 0);
+      .filter(([name]) => name !== 'speak' || this.speakCooldown <= 0);
     let total = entries.reduce((a, [, w]) => a + w, 0);
     let r = Math.random() * total;
     for (const [name, w] of entries) {
@@ -156,9 +178,24 @@ export class Behavior {
     return wa.x + margin + Math.random() * (wa.width - margin * 2);
   }
 
+  randomY() {
+    const lo = this.anim.minBodyY();
+    const hi = this.anim.maxBodyY();
+    return lo + Math.random() * (hi - lo);
+  }
+
   clampX(x, margin = 100) {
     const wa = this.workArea;
     return clamp(x, wa.x + margin, wa.x + wa.width - margin);
+  }
+
+  clampY(y) {
+    return clamp(y, this.anim.minBodyY(), this.anim.maxBodyY());
+  }
+
+  near(target, r = 10) {
+    const dy = target.y != null ? this.anim.bodyY - target.y : 0;
+    return Math.hypot(this.anim.bodyX - target.x, dy) < r;
   }
 
   honkVolume() {
@@ -170,15 +207,15 @@ export class Behavior {
     const A = this.anim;
     const tasks = {
       wander() {
-        // Short purposeful walks; the goose patrols its territory.
-        const near = Math.random() < 0.6;
-        const target = near
-          ? B.clampX(A.bodyX + (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 320))
-          : B.randomX();
+        // Short purposeful walks anywhere on screen; the goose patrols its territory.
+        const target = Math.random() < 0.55
+          ? { x: B.clampX(A.bodyX + (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 320)),
+              y: Math.random() < 0.5 ? B.clampY(A.bodyY + (Math.random() - 0.5) * 400) : null }
+          : { x: B.randomX(), y: B.randomY() };
         let linger = 0.4 + Math.random() * 1.4;
         return {
           name, update(dt) {
-            if (Math.abs(A.bodyX - target) > 8) {
+            if (!B.near(target)) {
               B.intent.move = target;
               B.intent.speedTier = B.tier === 3 ? 'run' : 'walk';
               return false;
@@ -194,8 +231,7 @@ export class Behavior {
         return {
           name, update(dt) {
             t -= dt;
-            const near = Math.hypot(B.cursor.x - A.bodyX, B.cursor.y - A.groundY) < 330;
-            B.intent.lookAt = near ? B.cursor : null;
+            B.intent.lookAt = B.gooseDistToCursor() < 330 ? B.cursor : null;
             return t <= 0;
           },
         };
@@ -207,7 +243,7 @@ export class Behavior {
             t -= dt;
             B.intent.sleep = true;
             // Woken rudely → offended honk.
-            if (Math.hypot(B.cursor.x - A.bodyX, B.cursor.y - A.groundY) < 130) {
+            if (B.gooseDistToCursor() < 130) {
               B.meter = clamp(B.meter + 0.06, 0, 1);
               B.intent.sleep = false;
               A.startAction('honk', { volume: B.honkVolume(), target: B.cursor });
@@ -237,12 +273,15 @@ export class Behavior {
       },
       stare() {
         // Walk pointedly near the cursor, face the camera, judge silently.
-        const target = B.clampX(B.cursor.x + (Math.random() < 0.5 ? -1 : 1) * 170);
+        const target = {
+          x: B.clampX(B.cursor.x + (Math.random() < 0.5 ? -1 : 1) * 170),
+          y: B.clampY(B.cursor.y + 150),
+        };
         let hold = 4 + Math.random() * 3.5;
         let staring = false;
         return {
           name, update(dt) {
-            if (!staring && Math.abs(A.bodyX - target) > 10) {
+            if (!staring && !B.near(target, 12)) {
               B.intent.move = target;
               return false;
             }
@@ -261,9 +300,12 @@ export class Behavior {
         let honks = 0;
         return {
           name, update(dt) {
-            const target = B.clampX(B.cursor.x + (B.cursor.x > A.bodyX ? -130 : 130));
+            const target = {
+              x: B.clampX(B.cursor.x + (B.cursor.x > A.bodyX ? -130 : 130)),
+              y: B.clampY(B.cursor.y + 120),
+            };
             if (phase === 'approach') {
-              if (Math.abs(A.bodyX - target) > 20) {
+              if (!B.near(target, 24)) {
                 B.intent.move = target;
                 B.intent.speedTier = 'run';
                 return false;
@@ -272,8 +314,7 @@ export class Behavior {
             }
             B.intent.lookAt = B.cursor;
             waitT -= dt;
-            const gooseDist = Math.hypot(B.cursor.x - A.bodyX, B.cursor.y - A.groundY + A.S * 0.5);
-            if (gooseDist < 150) {
+            if (B.gooseDistToCursor() < 150) {
               // Acknowledged. A curt, satisfied honk.
               B.meter = clamp(B.meter - 0.25, 0, 1);
               if (!A.busy) A.startAction('honk', { volume: 0.35, target: B.cursor });
@@ -282,9 +323,9 @@ export class Behavior {
             if (!A.busy && waitT <= 0) {
               if (honks >= 3) {
                 B.meter = clamp(B.meter + 0.03, 0, 1);
-                if (B.noteCooldown <= 0 && Math.random() < 0.5) {
-                  B.events.spawnNote(null);
-                  B.noteCooldown = NOTE_COOLDOWN;
+                if (B.speakCooldown <= 0) {
+                  B.events.speak(B.nextPhrase());
+                  B.speakCooldown = SPEAK_COOLDOWN;
                 }
                 return true; // gives up, files a complaint
               }
@@ -296,14 +337,18 @@ export class Behavior {
           },
         };
       },
-      note(taskOpts = {}) {
-        const target = B.clampX(B.cursor.x + (Math.random() < 0.5 ? -1 : 1) * 220);
+      speak() {
+        // Wander near the user, honk for attention, then say its piece.
+        const target = {
+          x: B.clampX(B.cursor.x + (Math.random() < 0.5 ? -1 : 1) * 220),
+          y: B.clampY(B.cursor.y + 160),
+        };
         let phase = 'walk';
         let t = 0;
         return {
           name, update(dt) {
             if (phase === 'walk') {
-              if (Math.abs(A.bodyX - target) > 10) {
+              if (!B.near(target, 12)) {
                 B.intent.move = target;
                 return false;
               }
@@ -312,28 +357,26 @@ export class Behavior {
             }
             if (phase === 'honk') {
               if (A.busy) return false;
-              const beak = A.beakWorld();
-              B.events.spawnNote(taskOpts.text || null, beak);
-              B.noteCooldown = NOTE_COOLDOWN;
-              phase = 'leave';
+              B.events.speak(opts.text || B.nextPhrase());
+              B.speakCooldown = SPEAK_COOLDOWN;
+              phase = 'linger';
             }
             t += dt;
-            const away = B.clampX(A.bodyX + (A.facing * -1) * 200);
-            B.intent.move = away;
-            return t > 2.2;
+            B.intent.lookAt = B.cursor;
+            return t > 2.5;
           },
         };
       },
-      enforce(taskOpts = {}) {
-        const target = B.clampX(taskOpts.x ?? B.cursor.x, 140);
+      enforce() {
+        const target = { x: B.clampX(opts.x ?? B.cursor.x, 140), y: null };
         let phase = 'charge';
         let honks = 0;
         let cooldown = 0;
-        let doneT = 0.8;
+        let doneT = 1.6;
         return {
           name, update(dt) {
             if (phase === 'charge') {
-              if (Math.abs(A.bodyX - target) > 16) {
+              if (!B.near(target, 18)) {
                 B.intent.move = target;
                 B.intent.speedTier = 'charge';
                 return false;
@@ -343,12 +386,13 @@ export class Behavior {
             if (phase === 'honk') {
               cooldown -= dt;
               // Honk upward at the offending window, not at the cursor.
-              const windowPoint = { x: target, y: B.workArea.y + B.workArea.height * 0.3 };
+              const windowPoint = { x: target.x, y: B.workArea.y + B.workArea.height * 0.3 };
               B.intent.lookAt = windowPoint;
               if (!A.busy && cooldown <= 0) {
                 if (honks >= 2) {
-                  B.events.closeDistraction(taskOpts.id);
+                  B.events.closeDistraction(opts.id);
                   B.meter = clamp(B.meter - 0.08, 0, 1); // enforcement is satisfying
+                  B.events.speak(`closed your ${opts.label || 'distraction'}. you're welcome.`);
                   phase = 'gloat';
                   return false;
                 }
@@ -360,7 +404,7 @@ export class Behavior {
             }
             // gloat: a brief victorious stare at the scene of the crime.
             doneT -= dt;
-            B.intent.faceCamera = doneT < 0.5;
+            B.intent.faceCamera = doneT < 1.2;
             return doneT <= 0;
           },
         };

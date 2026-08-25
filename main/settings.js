@@ -17,8 +17,20 @@ const DEFAULT_NOTES = [
   'this desktop is under new management.',
   're: bread. still waiting.',
   'your wallpaper is fine, I guess.',
-  'I forgive you. (for what you did.)',
   'honk was sent at 9:04. it is now much later.',
+  'per the terms of our arrangement (I honk, you listen):',
+  'I have reviewed your open tabs. we need to talk.',
+  'a lesser goose would let this slide.',
+  'circling back on the bread situation.',
+  'you seem busy. anyway—',
+  'I counted your unread emails. shameful. also, bread?',
+  'the cursor and I are no longer on speaking terms.',
+  'this is my desk now. you may continue using it. for now.',
+  'noted. and by noted I mean honk.',
+  'do you hear yourself typing? I do. constantly.',
+  'my lawyer (also a goose) will be in touch.',
+  'I was promised a pond.',
+  'consider this your final warning. (warning #47)',
 ];
 
 function settingsPath() {
@@ -43,6 +55,15 @@ export function saveSettings(settings) {
     fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2));
   } catch (err) {
     console.error('settings save failed', err);
+  }
+}
+
+export function saveNotes(phrases) {
+  try {
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(notesPath(), JSON.stringify(phrases, null, 2));
+  } catch (err) {
+    console.error('notes save failed', err);
   }
 }
 
