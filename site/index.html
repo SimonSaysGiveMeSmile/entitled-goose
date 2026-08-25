@@ -232,10 +232,19 @@
     <button class="btn honk" id="honk-btn" type="button">HONK</button>
   </div>
   <div class="mono" style="margin-top: 14px; color: #86847c;">
+    <span id="release-tag">latest release</span>&nbsp;·
     apple&nbsp;silicon&nbsp;dmg&nbsp;·
     <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases/latest/download/Entitled-Goose-mac-x64.dmg" style="color: inherit;">intel&nbsp;mac</a>&nbsp;·
     <a href="https://github.com/SimonSaysGiveMeSmile/entitled-goose/releases" style="color: inherit;">all&nbsp;downloads</a>
   </div>
+  <script>
+    // Buttons always serve the newest release via GitHub's /latest URLs;
+    // show which version that currently is.
+    fetch('https://api.github.com/repos/SimonSaysGiveMeSmile/entitled-goose/releases/latest')
+      .then((r) => r.json())
+      .then((d) => { if (d.tag_name) document.getElementById('release-tag').textContent = d.tag_name; })
+      .catch(() => {});
+  </script>
 </section>
 
 <div class="pond" aria-hidden="true">
