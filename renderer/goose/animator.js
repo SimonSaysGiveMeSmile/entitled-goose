@@ -4,7 +4,7 @@
 // additive breath/blink/tail layers.
 
 import { Gait } from '../../shared/gait.js';
-import { solveFabrik, blendToRest, chainLengths } from '../../shared/fabrik.js';
+import { solveFabrik, blendToRest, limitBends, chainLengths } from '../../shared/fabrik.js';
 import { twoBoneIK } from '../../shared/legik.js';
 import { springDamp, clamp, lerp } from '../../shared/spring.js';
 import { evalTimeline, timelineDuration } from '../../shared/kf.js';
@@ -69,6 +69,30 @@ export class GooseAnimator {
 
     this.action = null; // { name, t, timeline, fired:{}, target:{x,y} }
     this.honkVolume = 0.7;
+
+    this.dragging = false;
+    this.dragAmt = 0; // eased 0..1 for pose blending
+    this.falling = false;
+    this.fallV = 0;
+    this.landed = null; // callback fired once on touchdown
+  }
+
+  startDrag() {
+    this.dragging = true;
+    this.falling = false;
+    this.action = null;
+  }
+
+  endDrag(onLand) {
+    this.dragging = false;
+    if (this.bodyY < this.minBodyY()) {
+      this.falling = true;
+      this.fallV = Math.max(0, this.vy);
+      this.landed = onLand || null;
+    } else if (onLand) {
+      onLand();
+    }
+    this.gait.reset(this.bodyX / this.S, this.facing);
   }
 
   startAction(name, opts = {}) {
@@ -125,6 +149,37 @@ export class GooseAnimator {
   // intent: { move: {x, y|null}|null, speedTier, lookAt: {x,y}|null, faceCamera, showBubble, sleep }
   update(dt, intent, cursor) {
     const S = this.S;
+
+    // ---- Dragging: the goose hangs from the cursor grab point ----
+    this.dragAmt += clamp((this.dragging ? 1 : 0) - this.dragAmt, -dt * 4, dt * 4);
+    if (this.dragging && cursor) {
+      const grabX = cursor.x;
+      const grabY = cursor.y + 0.38 * S; // body center hangs below the grab
+      const oldX = this.bodyX;
+      const oldY = this.bodyY;
+      [this.bodyX, this.vx] = springDamp(this.bodyX, this.vx, grabX, 0.07, dt);
+      [this.bodyY, this.vy] = springDamp(this.bodyY, this.vy, grabY, 0.07, dt);
+      const wa = this.workArea;
+      this.bodyX = clamp(this.bodyX, wa.x + 0.3 * S, wa.x + wa.width - 0.3 * S);
+      this.bodyY = clamp(this.bodyY, wa.y + 0.55 * S, this.maxBodyY());
+      if (Math.abs(this.bodyX - oldX) > 1) this.facing = Math.sign(this.bodyX - oldX) || this.facing;
+      this.gait.update(dt, this.bodyX / S, 0, this.facing); // settle feet math
+      return this.composeDragState(dt, oldX, oldY);
+    }
+
+    // ---- Falling after being dropped from a height ----
+    if (this.falling) {
+      this.fallV += 2400 * dt;
+      this.bodyY += this.fallV * dt;
+      if (this.bodyY >= this.minBodyY()) {
+        this.bodyY = this.minBodyY();
+        this.falling = false;
+        this.gait.reset(this.bodyX / S, this.facing);
+        if (this.landed) { this.landed(); this.landed = null; }
+      } else {
+        return this.composeDragState(dt, this.bodyX, this.bodyY - this.fallV * dt);
+      }
+    }
 
     // ---- Locomotion (free 2D roaming) ----
     let speed = 0;
@@ -288,17 +343,24 @@ export class GooseAnimator {
     this.neckPts[0].x = root.x;
     this.neckPts[0].y = root.y;
     solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
+    // Bend limits keep the chain kink-free at extreme reach angles so the
+    // ribbon never creases or visually detaches from body or head.
+    limitBends(this.neckPts, this.neckLengths);
     const stiffness = this.action ? 0.06 : this.sleepAmt > 0.5 ? 0.5 : 0.30;
     blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, stiffness);
 
     // ---- Legs (local space) ----
     const legs = this.computeLegs(bodyDY);
 
-    // Head angle: mostly level beak; slight lift when reaching up.
+    // Head rides the neck's end direction: anchored along the final segment so
+    // it stays connected at any angle, tilting partially with the reach.
     const tip = this.neckPts[this.neckPts.length - 1];
     const prev = this.neckPts[this.neckPts.length - 2];
-    const segAngle = Math.atan2(tip.y - prev.y, tip.x - prev.x);
-    const headAngle = clamp((segAngle + Math.PI / 2) * 0.30, -0.5, 0.5);
+    let ux = tip.x - prev.x;
+    let uy = tip.y - prev.y;
+    const ul = Math.hypot(ux, uy) || 1;
+    ux /= ul; uy /= ul;
+    const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.35, -0.55, 0.55);
 
     return {
       bodyX: this.bodyX,
@@ -308,7 +370,7 @@ export class GooseAnimator {
       roll: this.gait.roll,
       tailWag: this.tailWag * 0.05,
       neckPts: this.neckPts,
-      head: { x: tip.x + 0.02, y: tip.y - 0.028 },
+      head: { x: tip.x + ux * 0.034, y: tip.y + uy * 0.034 },
       headAngle,
       beakOpen: this.beakOpen,
       eyelid: this.eyelid,
@@ -317,6 +379,66 @@ export class GooseAnimator {
       legs,
       shadowW: 0.30 - this.sleepAmt * 0.02,
       sleeping: this.sleepAmt > 0.5,
+    };
+  }
+
+  // Render state while dangling from the cursor (or falling): body swings like
+  // a pendulum, legs hang loose, the head fights to stay upright above it all.
+  composeDragState(dt, oldX, oldY) {
+    const S = this.S;
+    const pitch = clamp(-this.vx * 0.0011, -0.4, 0.4);
+
+    // Head strains upward while the body dangles.
+    this.headTX = this.bodyX + this.facing * 0.06 * S;
+    this.headTY = this.bodyY - 0.92 * S;
+    [this.headWX, this.headVX] = springDamp(this.headWX, this.headVX, this.headTX, 0.10, dt);
+    [this.headWY, this.headVY] = springDamp(this.headWY, this.headVY, this.headTY, 0.10, dt);
+    [this.beakOpen, this.beakV] = springDamp(this.beakOpen, this.beakV, this.dragAmt * 0.35, 0.06, dt);
+    [this.tailWag, this.tailV] = springDamp(this.tailWag, this.tailV, pitch * 2, 0.10, dt);
+
+    const bodyDY = 0;
+    const root = { x: GEO.neckRoot.x, y: GEO.neckRoot.y };
+    const localTX = ((this.headWX - this.bodyX) / S) * this.facing;
+    const localTY = (this.headWY - this.bodyY) / S;
+    this.neckPts[0].x = root.x;
+    this.neckPts[0].y = root.y;
+    solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
+    limitBends(this.neckPts, this.neckLengths);
+    blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, 0.2);
+
+    const tip = this.neckPts[this.neckPts.length - 1];
+    const prev = this.neckPts[this.neckPts.length - 2];
+    let ux = tip.x - prev.x;
+    let uy = tip.y - prev.y;
+    const ul = Math.hypot(ux, uy) || 1;
+    ux /= ul; uy /= ul;
+
+    // Dangling legs: feet hang below the hips with a velocity sway.
+    const sway = clamp(-this.vx * 0.0004, -0.08, 0.08);
+    const mkDangle = (hipGeo, phase) => {
+      const hip = { x: hipGeo.x, y: hipGeo.y };
+      const ankle = { x: hip.x + sway + phase * 0.02, y: hip.y + 0.185 };
+      const knee = twoBoneIK(hip, ankle, GEO.legUpper, GEO.legLower, -1);
+      return { hip, knee, ankle, droop: 0.9 + phase * 0.15 };
+    };
+
+    return {
+      bodyX: this.bodyX,
+      bodyY: this.bodyY,
+      facing: this.facing,
+      bodyDY,
+      roll: pitch,
+      tailWag: this.tailWag * 0.05,
+      neckPts: this.neckPts,
+      head: { x: tip.x + ux * 0.034, y: tip.y + uy * 0.034 },
+      headAngle: clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.35, -0.55, 0.55),
+      beakOpen: this.beakOpen,
+      eyelid: 0,
+      faceCamera: 0,
+      showBubble: false,
+      legs: { near: mkDangle(GEO.hipNear, 1), far: mkDangle(GEO.hipFar, -1) },
+      shadowW: 0.30 * Math.max(0.25, 1 - (this.minBodyY() - Math.min(this.bodyY, this.minBodyY())) / (0.9 * S) - this.dragAmt * 0.3),
+      sleeping: false,
     };
   }
 

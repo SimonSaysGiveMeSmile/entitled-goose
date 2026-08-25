@@ -61,6 +61,29 @@ export function solveFabrik(points, lengths, target, { iterations = 8, tolerance
   return points;
 }
 
+// Clamp the bend between consecutive segments to maxBend radians (and the
+// first segment to maxRootBend away from refDir). Prevents kinks and the
+// "disconnected neck" look at extreme reach angles. Lengths are preserved.
+export function limitBends(points, lengths, { maxBend = 0.62, maxRootBend = 0.95, refDir = { x: 0, y: -1 } } = {}) {
+  const n = points.length;
+  let prevAngle = Math.atan2(refDir.y, refDir.x);
+  for (let i = 1; i < n; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    let angle = Math.atan2(dy, dx);
+    const limit = i === 1 ? maxRootBend : maxBend;
+    let delta = angle - prevAngle;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    if (delta > limit) angle = prevAngle + limit;
+    else if (delta < -limit) angle = prevAngle - limit;
+    points[i].x = points[i - 1].x + Math.cos(angle) * lengths[i - 1];
+    points[i].y = points[i - 1].y + Math.sin(angle) * lengths[i - 1];
+    prevAngle = angle;
+  }
+  return points;
+}
+
 // Blend solved pose toward rest pose, then restore segment lengths from the root.
 export function blendToRest(points, rest, lengths, stiffness) {
   if (stiffness <= 0) return points;

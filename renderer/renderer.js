@@ -113,6 +113,18 @@ window.goose.on('cursor', (p) => {
   lastCursor = p;
   lastCursorTime = now;
 
+  // Held down and moved: the user is picking the goose up.
+  if (downAt !== null && !dragging && downCursor
+      && Math.hypot(p.x - downCursor.x, p.y - downCursor.y) > 14) {
+    beginDrag();
+    downAt = null;
+  }
+  // While dragging, stay solid even if the cursor outruns the goose bounds.
+  if (dragging) {
+    window.goose.send('click-through', { enable: false });
+    return;
+  }
+
   // Click-through toggling: the goose is solid, everything else passes
   // through. Solid mode is re-sent every second as a keepalive — main's
   // failsafe re-enables click-through if the renewals stop.
@@ -129,12 +141,30 @@ window.goose.on('cursor', (p) => {
 });
 let lastSolidSent = 0;
 
-// Poke vs pet: quick click offends; holding ≥1.1s appeases.
+// Poke, pet, or drag: a quick click offends; holding ≥1.1s appeases; moving
+// while holding picks the goose up (it does not care for this either).
 let downAt = null;
+let downCursor = null;
 let petTimer = null;
+let dragging = false;
+
+function beginDrag() {
+  clearTimeout(petTimer);
+  dragging = true;
+  animator.startDrag();
+  behavior.onDragStart();
+  synth.flutter(0.4);
+}
+
+function endDrag() {
+  dragging = false;
+  animator.endDrag(() => behavior.onDragEnd());
+}
+
 window.addEventListener('pointerdown', () => {
   if (!clickable) return;
   downAt = performance.now();
+  downCursor = { ...cursor };
   petTimer = setTimeout(() => {
     if (animator) animator.eyelid = 1;
     behavior.onPet();
@@ -144,12 +174,16 @@ window.addEventListener('pointerdown', () => {
 });
 window.addEventListener('pointerup', () => {
   clearTimeout(petTimer);
-  if (downAt !== null && performance.now() - downAt < 1100) {
+  if (dragging) {
+    endDrag();
+  } else if (downAt !== null && performance.now() - downAt < 1100) {
     behavior.onPoke();
     synth.flutter();
   }
   downAt = null;
+  downCursor = null;
 });
+window.addEventListener('blur', () => { if (dragging) endDrag(); });
 
 // ---- Window follow (renderer-owned to avoid stale-origin flicker) ----
 // The drawing origin updates in the SAME frame the move is ordered, so the
@@ -182,7 +216,8 @@ let lastFrame = performance.now();
 let stateReportT = 0;
 
 function step(dt) {
-  const intent = behavior.update(dt);
+  // The goose's mind pauses while it is being carried; it has other concerns.
+  const intent = dragging ? behavior.intent : behavior.update(dt);
   const state = animator.update(dt, intent, cursor);
   vfx.update(dt);
   bubble.update(dt, ctx);

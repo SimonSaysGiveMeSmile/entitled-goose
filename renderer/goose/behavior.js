@@ -93,6 +93,20 @@ export class Behavior {
     if (Math.random() < 0.4) this.events.speak('hm. acceptable.');
   }
 
+  onDragStart() {
+    this.task = null;
+    this.gapT = 1.0;
+    this.meter = clamp(this.meter + 0.05, 0, 1);
+  }
+
+  onDragEnd() {
+    // Set down (or dropped): indignant honk back at the hand that held it.
+    this.meter = clamp(this.meter + 0.10, 0, 1);
+    this.anim.startAction('honk', { volume: Math.min(1, this.honkVolume() + 0.2), target: this.cursor });
+    if (Math.random() < 0.45) this.events.speak('we do NOT do that.');
+    this.gapT = 1.8;
+  }
+
   onApologize() {
     this.meter = 0;
     setTimeout(() => this.events.speak('I forgive you. (for what you did.)'), 2500);

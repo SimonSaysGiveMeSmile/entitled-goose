@@ -89,8 +89,18 @@ function drawFoot(ctx, ankle, droop, color) {
 }
 
 // Smooth ribbon through neck chain points with a tapered width profile.
+// The chain is extended one phantom point INTO the body so the base never
+// shows a raw edge, and the tip gets a round cap that buries itself in the
+// head — no visible seams at any reach angle.
 function drawNeck(ctx, pts, color) {
-  const samples = sampleCatmullRom(pts, 18);
+  const first = pts[0];
+  const second = pts[1];
+  const dl = Math.hypot(second.x - first.x, second.y - first.y) || 1;
+  const rooted = [
+    { x: first.x - ((second.x - first.x) / dl) * 0.06, y: first.y - ((second.y - first.y) / dl) * 0.06 },
+    ...pts,
+  ];
+  const samples = sampleCatmullRom(rooted, 20);
   const n = samples.length;
   const left = [];
   const right = [];
@@ -113,6 +123,12 @@ function drawNeck(ctx, pts, color) {
   for (let i = 1; i < n; i++) ctx.lineTo(left[i].x, left[i].y);
   for (let i = n - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
   ctx.closePath();
+  ctx.fill();
+
+  // Round cap at the tip, bridging into the head.
+  const tip = samples[n - 1];
+  ctx.beginPath();
+  ctx.arc(tip.x, tip.y, 0.026, 0, Math.PI * 2);
   ctx.fill();
 }
 
