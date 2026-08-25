@@ -38,8 +38,13 @@ function clampNeckTarget(root, tx, ty) {
 // root to target whose control point carries an S-bias perpendicular to the
 // chord — one clean elastic curve at every reach angle.
 function quadNeck(pts, root, t) {
-  const cx = (root.x + t.x) / 2 - (t.y - root.y) * 0.13;
-  const cy = (root.y + t.y) / 2 + (t.x - root.x) * 0.10;
+  // The S-bias that reads as elastic on level reaches balloons the curve
+  // backward through the body on a steep down-peck — fade it out as the
+  // chord turns downward so ground pecks stay a clean forward arc.
+  const down = Math.max(0, Math.min(1, (t.y - root.y) / 0.30));
+  const bias = 1 - 0.65 * down;
+  const cx = (root.x + t.x) / 2 - (t.y - root.y) * 0.13 * bias;
+  const cy = (root.y + t.y) / 2 + (t.x - root.x) * 0.10 * bias;
   const n = pts.length;
   for (let i = 0; i < n; i++) {
     const u = i / (n - 1);

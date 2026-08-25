@@ -100,7 +100,7 @@ function drawNeck(ctx, pts, color) {
   const second = pts[1];
   const dl = Math.hypot(second.x - first.x, second.y - first.y) || 1;
   const rooted = [
-    { x: first.x - ((second.x - first.x) / dl) * 0.06, y: first.y - ((second.y - first.y) / dl) * 0.06 },
+    { x: first.x - ((second.x - first.x) / dl) * 0.09, y: first.y - ((second.y - first.y) / dl) * 0.09 },
     ...pts,
   ];
   const samples = sampleCatmullRom(rooted, 20);
@@ -274,6 +274,11 @@ export function drawGoose(ctx, state) {
     drawFoot(ctx, f.ankle, f.droop, PALETTE.orangeFar);
   }
 
+  // Neck UNDER the body: the breast occludes the base, so the join is
+  // seamless at every roll and reach angle — a neck drawn on top shows as a
+  // flat band across the body's shade gradient and a loose seam at the root.
+  drawNeck(ctx, state.neckPts, PALETTE.body);
+
   // Body with weight-shift roll.
   ctx.save();
   ctx.rotate(state.roll * 0.5);
@@ -292,8 +297,6 @@ export function drawGoose(ctx, state) {
   ctx.restore();
   ctx.restore();
 
-  // Neck (same fill as body so the join is seamless), then head.
-  drawNeck(ctx, state.neckPts, PALETTE.body);
   drawHead(ctx, state.head, state);
 
   if (state.showBubble) drawEllipsisBubble(ctx, state.head);
