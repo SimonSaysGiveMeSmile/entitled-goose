@@ -1,5 +1,7 @@
 # Entitled Goose
 
+![The goose, patrolling its territory](docs/demo.gif)
+
 A macOS desktop pet: a goose — faithful in style to *that* goose — that lives on your
 desktop as a transparent overlay and acts like it owns the place. It waddles along the
 bottom of your screen, honks at you, judges you silently, leaves passive-aggressive

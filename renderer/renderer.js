@@ -45,6 +45,7 @@ async function boot() {
     footPlant: (worldX, worldY, dir) => {
       // Angry geese track mud. Content geese are tidy.
       if (behavior && behavior.tier >= 3) vfx.stampFoot(worldX, worldY, dir);
+      if (settings.footsteps) synth.step();
     },
   };
   animator = new GooseAnimator({
@@ -64,7 +65,10 @@ async function boot() {
     phrases: state.phrases || [],
     events: {
       speak: (text) => bubble.say(text),
-      closeDistraction: (id) => window.goose.send('distraction-close', { id }),
+      closeDistraction: (id) => {
+        synth.peck();
+        window.goose.send('distraction-close', { id });
+      },
     },
   });
 
@@ -109,16 +113,21 @@ window.goose.on('cursor', (p) => {
   lastCursor = p;
   lastCursorTime = now;
 
-  // Click-through toggling: the goose is solid, everything else passes through.
+  // Click-through toggling: the goose is solid, everything else passes
+  // through. Solid mode is re-sent every second as a keepalive — main's
+  // failsafe re-enables click-through if the renewals stop.
   if (animator) {
     const b = animator.bounds();
     const over = p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
-    if (over !== clickable) {
+    const nowMs = performance.now();
+    if (over !== clickable || (over && nowMs - lastSolidSent > 1000)) {
       clickable = over;
+      if (over) lastSolidSent = nowMs;
       window.goose.send('click-through', { enable: !over });
     }
   }
 });
+let lastSolidSent = 0;
 
 // Poke vs pet: quick click offends; holding ≥1.1s appeases.
 let downAt = null;
@@ -129,6 +138,7 @@ window.addEventListener('pointerdown', () => {
   petTimer = setTimeout(() => {
     if (animator) animator.eyelid = 1;
     behavior.onPet();
+    synth.hmph();
     downAt = null;
   }, 1100);
 });
@@ -136,6 +146,7 @@ window.addEventListener('pointerup', () => {
   clearTimeout(petTimer);
   if (downAt !== null && performance.now() - downAt < 1100) {
     behavior.onPoke();
+    synth.flutter();
   }
   downAt = null;
 });
@@ -144,11 +155,13 @@ window.addEventListener('pointerup', () => {
 // The drawing origin updates in the SAME frame the move is ordered, so the
 // goose never draws against a window position it doesn't have yet. Coarse
 // quantized steps keep moves infrequent.
-const WIN_W = 660;
-const WIN_H = 540;
 const FOLLOW_QUANTUM = 64;
 
 function followWindow() {
+  // Window size comes from the actual window — keep main/main.js WIN_W/WIN_H
+  // as the single source of truth.
+  const WIN_W = window.innerWidth;
+  const WIN_H = window.innerHeight;
   const anchorX = origin.x + WIN_W / 2;
   const anchorY = origin.y + WIN_H * 0.72;
   if (Math.abs(animator.bodyX - anchorX) <= 200 && Math.abs(animator.bodyY - anchorY) <= 105) return;

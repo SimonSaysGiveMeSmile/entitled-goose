@@ -103,6 +103,10 @@
     <input type="checkbox" id="focusEnforce" />
   </div>
   <div class="row">
+    <label>Footstep sounds<div class="hint">quiet webbed taps (they get old fast)</div></label>
+    <input type="checkbox" id="footsteps" />
+  </div>
+  <div class="row">
     <label>Goose size</label>
     <input type="range" id="scale" min="120" max="260" step="10" />
   </div>
@@ -125,6 +129,7 @@
     $('muted').checked = s.settings.muted;
     $('polite').checked = s.settings.polite;
     $('focusEnforce').checked = s.settings.focusEnforce;
+    $('footsteps').checked = s.settings.footsteps;
     $('scale').value = s.settings.scale;
     $('phrases').value = (s.phrases || []).join('\n');
     updateMeter(s.meter, s.tier);
@@ -135,7 +140,7 @@
     $('tier').textContent = tier || 'content';
   }
 
-  for (const id of ['muted', 'polite', 'focusEnforce']) {
+  for (const id of ['muted', 'polite', 'focusEnforce', 'footsteps']) {
     $(id).addEventListener('change', () => window.panel.setSettings({ [id]: $(id).checked }));
   }
   $('scale').addEventListener('change', () => window.panel.setSettings({ scale: Number($('scale').value) }));

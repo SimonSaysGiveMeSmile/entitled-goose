@@ -70,6 +70,90 @@ export class HonkSynth {
     noise.stop(t0 + 0.06);
   }
 
+  // Quiet webbed-foot tap. Default OFF — footstep sounds were the #1
+  // annoyance complaint about prior desktop geese.
+  step() {
+    if (this.muted) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer();
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 2200 + Math.random() * 600;
+    f.Q.value = 1.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.05, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.03);
+    noise.connect(f).connect(g).connect(ctx.destination);
+    noise.start(t0);
+    noise.stop(t0 + 0.04);
+  }
+
+  // Sharp little peck — used when the goose "presses" a close button.
+  peck(volume = 0.5) {
+    if (this.muted) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1150, t0);
+    osc.frequency.exponentialRampToValueAtTime(650, t0 + 0.05);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(volume * 0.5, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.06);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.07);
+  }
+
+  // Ruffled-feathers flutter for the poke flinch.
+  flutter(volume = 0.5) {
+    if (this.muted) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const ctx = this.ctx;
+    for (let i = 0; i < 3; i++) {
+      const t0 = ctx.currentTime + i * 0.06;
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer();
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.setValueAtTime(420 + i * 140, t0);
+      f.Q.value = 2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(volume * 0.4, t0 + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.055);
+      noise.connect(f).connect(g).connect(ctx.destination);
+      noise.start(t0);
+      noise.stop(t0 + 0.06);
+    }
+  }
+
+  // Low curt "hmph" for grudging approval (petting).
+  hmph(volume = 0.4) {
+    if (this.muted) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, t0);
+    osc.frequency.exponentialRampToValueAtTime(105, t0 + 0.09);
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 520;
+    f.Q.value = 2.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(volume * 0.6, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12);
+    osc.connect(f).connect(g).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.13);
+  }
+
   noiseBuffer() {
     if (!this._noise) {
       const len = this.ctx.sampleRate * 0.1;

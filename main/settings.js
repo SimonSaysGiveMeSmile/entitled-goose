@@ -7,6 +7,7 @@ const DEFAULTS = {
   polite: false,
   grudgePending: false,
   focusEnforce: true, // the goose closes entertainment windows to keep you working
+  footsteps: false, // quiet webbed taps on foot plants (off: they get old fast)
   scale: 170, // goose standing height in px
 };
 

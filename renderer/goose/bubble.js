@@ -53,9 +53,9 @@ export class SpeechBubble {
     const pop = 1 - (1 - inT) * (1 - inT); // ease-out
     const alpha = Math.min(inT * 2, outT);
 
-    // Sits above the head, on the side the character faces.
+    // Sits well above the head, on the side the character faces.
     const bx = a.x + (a.facing || 1) * 26;
-    const by = a.y - 34 - c.h / 2;
+    const by = a.y - 58 - c.h / 2;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -70,11 +70,11 @@ export class SpeechBubble {
     ctx.fill();
     ctx.stroke();
 
-    // Tail pointing back toward the anchor.
+    // Tail pointing back toward the anchor (longer to bridge the raised gap).
     const tailX = -(a.facing || 1) * Math.min(c.w * 0.28, 40);
     ctx.beginPath();
     ctx.moveTo(tailX - 8, c.h / 2 - 1);
-    ctx.lineTo(tailX + (a.facing || 1) * -6, c.h / 2 + 16);
+    ctx.lineTo(tailX + (a.facing || 1) * -10, c.h / 2 + 34);
     ctx.lineTo(tailX + 8, c.h / 2 - 1);
     ctx.closePath();
     ctx.fill();

@@ -368,7 +368,16 @@ export class Behavior {
         };
       },
       enforce() {
-        const target = { x: B.clampX(opts.x ?? B.cursor.x, 140), y: null };
+        // The close button of the offending window (or a sensible stand-in).
+        const btn = {
+          x: B.clampX(opts.x ?? B.cursor.x, 140),
+          y: opts.y != null ? opts.y : B.workArea.y + B.workArea.height * 0.25,
+        };
+        // Stand so the beak can reach the button: body below-right of it.
+        const target = {
+          x: B.clampX(btn.x + 40, 140),
+          y: B.clampY(btn.y + 0.95 * A.S),
+        };
         let phase = 'charge';
         let honks = 0;
         let cooldown = 0;
@@ -385,18 +394,17 @@ export class Behavior {
             }
             if (phase === 'honk') {
               cooldown -= dt;
-              // Honk upward at the offending window, not at the cursor.
-              const windowPoint = { x: target.x, y: B.workArea.y + B.workArea.height * 0.3 };
-              B.intent.lookAt = windowPoint;
+              B.intent.lookAt = btn;
               if (!A.busy && cooldown <= 0) {
                 if (honks >= 2) {
+                  // The final "honk" is the peck ON the close button.
                   B.events.closeDistraction(opts.id);
                   B.meter = clamp(B.meter - 0.08, 0, 1); // enforcement is satisfying
                   B.events.speak(`closed your ${opts.label || 'distraction'}. you're welcome.`);
                   phase = 'gloat';
                   return false;
                 }
-                A.startAction('honk', { volume: Math.min(1, B.honkVolume() + 0.25), target: windowPoint });
+                A.startAction('honk', { volume: Math.min(1, B.honkVolume() + 0.25), target: btn });
                 honks++;
                 cooldown = 0.4;
               }

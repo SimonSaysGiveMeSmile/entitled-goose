@@ -67,7 +67,7 @@ $procId = 0
 $r = New-Object FG+RECT
 [void][FG]::GetWindowRect($h, [ref]$r)
 $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
-"$($p.ProcessName)|$([Math]::Round(($r.Left+$r.Right)/2))|$($sb.ToString())"
+"$($p.ProcessName)|$($r.Left)|$($r.Top)|$($r.Right)|$($sb.ToString())"
 `.trim();
 
 const PS_CLOSE_FOREGROUND = `
@@ -210,7 +210,7 @@ export class FocusWarden {
   async pollWindows() {
     const BROWSERS = ['chrome', 'msedge', 'brave', 'opera', 'firefox', 'vivaldi', 'arc'];
     const out = await powershell(PS_FOREGROUND);
-    const [proc, centerX, ...titleParts] = out.split('|');
+    const [proc, left, top, right, ...titleParts] = out.split('|');
     const title = titleParts.join('|');
     if (!proc || proc.toLowerCase() === 'electron' || proc === 'Entitled Goose') return;
 
@@ -234,33 +234,41 @@ export class FocusWarden {
       await powershell(PS_CLOSE_FOREGROUND);
     };
 
-    const x = parseInt(centerX, 10);
+    // Windows close button lives top-right.
+    const x = parseInt(right, 10) - 45;
+    const y = parseInt(top, 10) + 22;
     const id = this.nextId++;
     this.pending.set(id, { closer, label: appBlocked ? proc : 'that tab' });
     this.cooldowns.set(key, Date.now());
-    this.onDistraction({ id, label: appBlocked ? proc : 'that tab', x: Number.isFinite(x) ? x : null });
+    this.onDistraction({
+      id,
+      label: appBlocked ? proc : 'that tab',
+      x: Number.isFinite(x) ? x : null,
+      y: Number.isFinite(y) ? y : null,
+    });
     setTimeout(() => this.pending.delete(id), 20_000);
   }
 
   async emit(label, appName, closer, cooldownKey) {
-    // Where should the goose run? Toward the offending window if we can ask.
+    // The goose walks to the window's close-button corner (top-left on macOS,
+    // where the traffic lights and tab X live) and pecks before we close.
     let targetX = null;
+    let targetY = null;
     try {
       const pos = await osascript(
         `tell application "System Events" to tell process "${appName}" to get position of front window`
       );
-      const size = await osascript(
-        `tell application "System Events" to tell process "${appName}" to get size of front window`
-      );
-      const [px] = pos.split(',').map((n) => parseInt(n, 10));
-      const [sw] = size.split(',').map((n) => parseInt(n, 10));
-      if (Number.isFinite(px) && Number.isFinite(sw)) targetX = px + sw / 2;
+      const [px, py] = pos.split(',').map((n) => parseInt(n, 10));
+      if (Number.isFinite(px) && Number.isFinite(py)) {
+        targetX = px + 70;
+        targetY = py + 40;
+      }
     } catch { /* fine: the goose will improvise */ }
 
     const id = this.nextId++;
     this.pending.set(id, { closer, label });
     this.cooldowns.set(cooldownKey, Date.now());
-    this.onDistraction({ id, label, x: targetX });
+    this.onDistraction({ id, label, x: targetX, y: targetY });
 
     // If the renderer never follows through, drop the pending entry.
     setTimeout(() => this.pending.delete(id), 20_000);

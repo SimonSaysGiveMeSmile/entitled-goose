@@ -11,8 +11,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Honks must be able to play without a user gesture inside the window.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
-const WIN_W = 660;
-const WIN_H = 540;
+const WIN_W = 800;
+const WIN_H = 640;
 
 let win = null;
 let tray = null;
@@ -172,8 +172,8 @@ app.whenReady().then(() => {
   }, 33);
 
   const onDisplayChange = () => {
+    // Renderer re-follows on its next frame once it has the new bounds.
     sendToGoose('work-area', workArea());
-    repositionForGoose(workArea().x + workArea().width / 2);
   };
   screen.on('display-added', onDisplayChange);
   screen.on('display-removed', onDisplayChange);
@@ -220,8 +220,19 @@ ipcMain.on('panel:set-phrases', (_e, phrases) => {
 
 ipcMain.on('panel:apologize', () => sendToGoose('apologize', {}));
 
+// Failsafe: solid mode must be continuously renewed by the renderer, so a
+// missed IPC or a hung renderer can never leave the overlay blocking real
+// computer use — it always falls back to click-through.
+let solidFailsafe = null;
 ipcMain.on('r:click-through', (_e, { enable }) => {
-  if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(enable, { forward: true });
+  if (!win || win.isDestroyed()) return;
+  win.setIgnoreMouseEvents(enable, { forward: true });
+  clearTimeout(solidFailsafe);
+  if (!enable) {
+    solidFailsafe = setTimeout(() => {
+      if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(true, { forward: true });
+    }, 2500);
+  }
 });
 
 ipcMain.on('r:distraction-close', async (_e, { id }) => {
