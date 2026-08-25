@@ -339,6 +339,13 @@ ipcMain.on('r:open-panel', () => openPanel());
 ipcMain.on('panel:check-updates', () => updater && updater.check());
 ipcMain.on('panel:install-update', () => updater && updater.install());
 
+// Plain restart (not the updater path): relaunch with the same command line
+// and exit hard so autoInstallOnAppQuit can't hijack it into an update flow.
+ipcMain.on('panel:restart', () => {
+  app.relaunch();
+  app.exit(0);
+});
+
 // Failsafe: solid mode must be continuously renewed by the renderer, so a
 // missed IPC or a hung renderer can never leave the overlay blocking real
 // computer use — it always falls back to click-through.

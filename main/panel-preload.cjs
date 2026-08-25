@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('panel', {
   apologize: () => ipcRenderer.send('panel:apologize'),
   checkUpdates: () => ipcRenderer.send('panel:check-updates'),
   installUpdate: () => ipcRenderer.send('panel:install-update'),
+  restart: () => ipcRenderer.send('panel:restart'),
 });

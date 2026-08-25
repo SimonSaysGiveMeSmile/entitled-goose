@@ -198,6 +198,7 @@
   <div class="btns">
     <button id="apologize">Apologize to the goose</button>
     <button id="shush">Shush (1 hour)</button>
+    <button id="restart">Restart goose</button>
   </div>
 </div>
 <script>
@@ -271,6 +272,10 @@
   window.addEventListener('blur', () => { if (blTimer) { clearTimeout(blTimer); blTimer = null; sendBlocklist(); } });
 
   $('apologize').addEventListener('click', () => window.panel.apologize());
+  $('restart').addEventListener('click', () => {
+    $('restart').textContent = 'Restarting…';
+    window.panel.restart();
+  });
   $('shush').addEventListener('click', () => {
     window.panel.setSettings({ shushUntil: Date.now() + 3600 * 1000 });
     $('shush').textContent = 'Shushed \u2713';
