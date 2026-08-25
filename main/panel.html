@@ -4,47 +4,55 @@
 <meta charset="utf-8" />
 <style>
   @font-face {
-    font-family: "Spline Sans Mono";
-    src: url("../assets/fonts/spline-sans-mono-var.woff2") format("woff2");
+    font-family: "Azeret Mono";
+    src: url("../assets/fonts/azeret-mono-var.woff2") format("woff2");
     font-weight: 400 600;
   }
+  @font-face {
+    font-family: "Fraunces";
+    src: url("../assets/fonts/fraunces-var.woff2") format("woff2");
+    font-weight: 400 900;
+  }
   :root {
-    --green: #1e3a29;
-    --green-deep: #16291d;
-    --cream: #f3efe2;
-    --cream-dim: rgba(243, 239, 226, 0.55);
+    --paper: #f4f1e8;
+    --paper-deep: #eae6d8;
+    --ink: #272725;
+    --ink-dim: #86847c;
     --orange: #f58731;
-    --rule: rgba(243, 239, 226, 0.14);
+    --lawn: #45785f;
+    --rule: #d8d3c4;
   }
   body {
     margin: 0;
-    font-family: "Spline Sans Mono", ui-monospace, monospace;
-    font-size: 12.5px;
-    background: var(--green);
-    color: var(--cream);
+    font-family: "Azeret Mono", ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--paper);
+    color: var(--ink);
     user-select: none;
   }
   .wrap { padding: 20px 22px 22px; }
-  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: 0.04em; }
-  .sub { color: var(--cream-dim); margin-bottom: 16px; font-size: 11px; font-style: italic; }
+  h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-size: 22px;
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+  }
+  .sub { color: var(--ink-dim); margin-bottom: 16px; font-size: 11px; font-style: italic; font-family: "Fraunces", serif; }
 
   .meter-card {
-    background: var(--green-deep);
-    border: 1px solid var(--rule);
+    background: var(--paper-deep);
+    border: 1.5px solid var(--ink);
     padding: 12px 14px;
     margin-bottom: 16px;
   }
-  .meter-label { display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.1em; font-size: 11px; }
+  .meter-label { display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.12em; font-size: 10.5px; }
   #tier { font-weight: 600; color: var(--orange); }
-  .bar {
-    height: 9px;
-    background: rgba(0, 0, 0, 0.35);
-    overflow: hidden;
-  }
+  .bar { height: 9px; background: var(--rule); overflow: hidden; }
   #fill {
     height: 100%;
     width: 15%;
-    background: linear-gradient(90deg, #7fae74, #e8c34a 55%, var(--orange));
+    background: linear-gradient(90deg, var(--lawn), #e8c34a 55%, var(--orange));
     background-size: 340px 100%;
     transition: width 0.4s;
   }
@@ -57,15 +65,15 @@
     border-bottom: 1px solid var(--rule);
   }
   .row label { flex: 1; }
-  .hint { color: var(--cream-dim); font-size: 10.5px; margin-top: 2px; }
+  .hint { color: var(--ink-dim); font-size: 10px; margin-top: 2px; }
   input[type="range"] { width: 130px; accent-color: var(--orange); }
-  input[type="checkbox"] { accent-color: var(--orange); }
+  input[type="checkbox"] { accent-color: var(--lawn); }
   select {
-    background: var(--green-deep);
-    color: var(--cream);
-    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 11.5px;
     padding: 3px 6px;
   }
 
@@ -74,30 +82,33 @@
     box-sizing: border-box;
     height: 108px;
     margin-top: 8px;
-    background: var(--green-deep);
-    color: var(--cream);
-    border: 1px solid var(--rule);
+    background: #fffdf6;
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
     padding: 8px;
-    font: 11.5px/1.5 "Spline Sans Mono", ui-monospace, monospace;
+    font: 11px/1.5 "Azeret Mono", ui-monospace, monospace;
     resize: none;
   }
   .btns { display: flex; gap: 8px; margin-top: 14px; }
   button {
     flex: 1;
     padding: 9px 10px;
-    border: 1.5px solid var(--orange);
-    background: var(--orange);
-    color: var(--green-deep);
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
-  button:hover { background: var(--cream); border-color: var(--cream); }
-  .saved { color: #9fce8f; font-size: 11px; opacity: 0; transition: opacity 0.3s; }
+  button:hover { background: var(--orange); border-color: var(--orange); color: var(--ink); }
+  button.ready { background: var(--lawn); border-color: var(--lawn); color: var(--paper); }
+  .saved { color: var(--lawn); font-size: 11px; opacity: 0; transition: opacity 0.3s; }
+  .update-status { color: var(--ink-dim); font-size: 10.5px; }
 </style>
 </head>
 <body>
@@ -143,6 +154,11 @@
     </select>
   </div>
 
+  <div class="row">
+    <label>Updates<div class="hint"><span id="up-status" class="update-status">checking…</span></div></label>
+    <button id="up-btn" style="flex: 0 0 auto; width: auto; padding: 6px 14px;">Check</button>
+  </div>
+
   <div class="row" style="border-bottom: 0; padding-bottom: 2px;"><label><b>Awareness</b></label></div>
   <div class="row">
     <label>Battery warnings<div class="hint">"your battery is at 12%. charge it. I live here."</div></label>
@@ -159,6 +175,10 @@
   <div class="row">
     <label>Calendar reminders<div class="hint">10-min warnings; asks for Calendar permission</div></label>
     <input type="checkbox" id="aw-calendar" />
+  </div>
+  <div class="row">
+    <label>Phone suspicion<div class="hint">"you're on your phone, aren't you."</div></label>
+    <input type="checkbox" id="aw-phone" />
   </div>
 
   <div class="row" style="border: 0; display: block;">
@@ -177,12 +197,13 @@
 
   <div class="btns">
     <button id="apologize">Apologize to the goose</button>
+    <button id="shush">Shush (1 hour)</button>
   </div>
 </div>
 <script>
   const $ = (id) => document.getElementById(id);
   let saveTimer = null;
-  let awareness = { battery: true, time: true, reports: true, calendar: false };
+  let awareness = { battery: true, time: true, reports: true, calendar: false, phone: true };
 
   async function load() {
     const s = await window.panel.getState();
@@ -193,8 +214,8 @@
     $('scale').value = s.settings.scale;
     $('energy').value = s.settings.energy ?? 50;
     $('fps').value = String(s.settings.fps || 120);
-    awareness = { battery: true, time: true, reports: true, calendar: false, ...(s.settings.awareness || {}) };
-    for (const k of ['battery', 'time', 'reports', 'calendar']) $('aw-' + k).checked = awareness[k];
+    awareness = { battery: true, time: true, reports: true, calendar: false, phone: true, ...(s.settings.awareness || {}) };
+    for (const k of ['battery', 'time', 'reports', 'calendar', 'phone']) $('aw-' + k).checked = awareness[k];
     $('phrases').value = (s.phrases || []).join('\n');
     $('blockDomains').value = (s.blocklist?.domains || []).join('\n');
     $('blockApps').value = (s.blocklist?.apps || []).join('\n');
@@ -212,7 +233,7 @@
   $('scale').addEventListener('change', () => window.panel.setSettings({ scale: Number($('scale').value) }));
   $('fps').addEventListener('change', () => window.panel.setSettings({ fps: Number($('fps').value) }));
   $('energy').addEventListener('change', () => window.panel.setSettings({ energy: Number($('energy').value) }));
-  for (const k of ['battery', 'time', 'reports', 'calendar']) {
+  for (const k of ['battery', 'time', 'reports', 'calendar', 'phone']) {
     $('aw-' + k).addEventListener('change', () => {
       awareness = { ...awareness, [k]: $('aw-' + k).checked };
       window.panel.setSettings({ awareness });
@@ -250,10 +271,48 @@
   window.addEventListener('blur', () => { if (blTimer) { clearTimeout(blTimer); blTimer = null; sendBlocklist(); } });
 
   $('apologize').addEventListener('click', () => window.panel.apologize());
+  $('shush').addEventListener('click', () => {
+    window.panel.setSettings({ shushUntil: Date.now() + 3600 * 1000 });
+    $('shush').textContent = 'Shushed \u2713';
+    setTimeout(() => { $('shush').textContent = 'Shush (1 hour)'; }, 1500);
+  });
+
+  function renderUpdate(s) {
+    const st = s.update || { status: 'dev' };
+    const el = $('up-status');
+    const btn = $('up-btn');
+    btn.classList.remove('ready');
+    if (st.status === 'ready') {
+      el.textContent = `v${st.available} downloaded`;
+      btn.textContent = 'Restart & update';
+      btn.classList.add('ready');
+    } else if (st.status === 'downloading') {
+      el.textContent = `downloading v${st.available || ''} ${st.percent != null ? st.percent + '%' : ''}`;
+      btn.textContent = '…';
+    } else if (st.status === 'checking') {
+      el.textContent = 'checking…';
+      btn.textContent = '…';
+    } else if (st.status === 'up-to-date') {
+      el.textContent = `v${s.appVersion} — up to date`;
+      btn.textContent = 'Check';
+    } else if (st.status === 'error') {
+      el.textContent = 'update check failed';
+      btn.textContent = 'Retry';
+    } else {
+      el.textContent = `v${s.appVersion || ''}${st.status === 'dev' ? ' (dev — updates off)' : ''}`;
+      btn.textContent = 'Check';
+    }
+  }
+  $('up-btn').addEventListener('click', async () => {
+    const s = await window.panel.getState();
+    if (s.update?.status === 'ready') window.panel.installUpdate();
+    else window.panel.checkUpdates();
+  });
 
   setInterval(async () => {
     const s = await window.panel.getState();
     updateMeter(s.meter, s.tier);
+    renderUpdate(s);
   }, 700);
 
   load();

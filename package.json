@@ -1,6 +1,6 @@
 {
   "name": "entitled-goose",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "A desktop pet goose that acts like it owns your desktop. Original art & audio; not affiliated with House House, Panic, or samperson.",
   "main": "main/main.js",
   "type": "module",
@@ -35,24 +35,53 @@
     "mac": {
       "category": "public.app-category.entertainment",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "extendInfo": {
         "LSUIElement": true
-      }
+      },
+      "identity": "Jiahe Tian (4QUC4B3L36)"
     },
     "dmg": {
       "title": "Entitled Goose"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SimonSaysGiveMeSmile",
+        "repo": "entitled-goose"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

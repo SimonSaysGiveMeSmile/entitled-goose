@@ -75,6 +75,7 @@ async function boot() {
 
   if (settings.awareness) behavior.awareness = { ...behavior.awareness, ...settings.awareness };
   if (settings.energy != null) { behavior.energy = settings.energy; animator.energy = settings.energy; }
+  if (settings.shushUntil != null) behavior.shushUntil = settings.shushUntil;
   if (pendingEnv) {
     behavior.onEnv(pendingEnv);
     pendingEnv = null;
@@ -95,7 +96,10 @@ window.goose.on('work-area', (wa) => {
   workArea = wa;
   if (animator) {
     animator.workArea = wa;
-    behavior.workArea = wa;
+    behavior.onWorkAreaChange(wa);
+    // Display switch: stale world-space VFX belongs to the old screen.
+    vfx.footprints.length = 0;
+    vfx.honkLines.length = 0;
   }
 });
 
@@ -106,6 +110,7 @@ window.goose.on('settings', (s) => {
     behavior.polite = settings.polite;
     if (settings.awareness) behavior.awareness = { ...behavior.awareness, ...settings.awareness };
     if (settings.energy != null) behavior.energy = settings.energy;
+    if (settings.shushUntil != null) behavior.shushUntil = settings.shushUntil;
   }
   if (animator) {
     if (settings.scale) animator.S = settings.scale;
@@ -121,7 +126,10 @@ window.goose.on('apologize', () => behavior && behavior.onApologize());
 
 window.goose.on('distraction', (d) => behavior && behavior.enforce(d));
 
-window.goose.on('speak', ({ text }) => bubble && bubble.say(text));
+window.goose.on('speak', ({ text }) => {
+  // Main-process speech (updater, permission prompts) respects shush too.
+  if (bubble && !(behavior && behavior.shushed)) bubble.say(text);
+});
 
 window.goose.on('space-changed', () => behavior && behavior.onSpaceChange());
 

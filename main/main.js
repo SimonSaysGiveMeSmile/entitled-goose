@@ -7,6 +7,7 @@ import { FocusWarden, loadBlocklist, saveBlocklist } from './focus.js';
 import { openPanel } from './panel.js';
 import { EnvMonitor } from './env.js';
 import { CalendarWatcher } from './calendar.js';
+import { Updater } from './updater.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,7 @@ let settings = loadSettings();
 let quitting = false;
 let warden = null;
 let envMonitor = null;
+let updater = null;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -26,6 +28,13 @@ if (!app.requestSingleInstanceLock()) {
 
 function workArea() {
   return screen.getPrimaryDisplay().workArea;
+}
+
+// The work area of the display the overlay currently lives on (it follows
+// the cursor across displays) — primary only before the window exists.
+function currentWorkArea() {
+  if (win && !win.isDestroyed()) return screen.getDisplayMatching(win.getBounds()).workArea;
+  return workArea();
 }
 
 function applyOverlayFlags() {
@@ -78,7 +87,7 @@ function createWindow() {
   // Gotcha: click-through must be re-applied after every load of the renderer.
   win.webContents.on('did-finish-load', () => {
     applyOverlayFlags();
-    sendToGoose('work-area', workArea());
+    sendToGoose('work-area', currentWorkArea());
     sendToGoose('window-moved', win.getBounds());
     sendToGoose('settings', settings);
     // Renderer boot races the first env timer: send a snapshot on every load.
@@ -109,6 +118,14 @@ function buildTrayMenu() {
       {
         label: 'Apologize to the goose',
         click: () => sendToGoose('apologize', {}),
+      },
+      {
+        label: 'Shush for an hour',
+        click: () => {
+          settings.shushUntil = Date.now() + 3600_000;
+          saveSettings(settings);
+          sendToGoose('settings', settings);
+        },
       },
       {
         label: 'Mute honks',
@@ -167,15 +184,38 @@ app.whenReady().then(() => {
   buildTray();
 
   // Global cursor position: permission-free polling from the main process.
+  // Also: multi-display follow — if the cursor dwells on another display for
+  // ~4s, the overlay moves there and the goose sprints in after you.
+  let otherDisplayPolls = 0;
   setInterval(() => {
     const p = screen.getCursorScreenPoint();
     sendToGoose('cursor', p);
+    if (!win || win.isDestroyed()) return;
+    const cursorDisplay = screen.getDisplayNearestPoint(p);
+    const windowDisplay = screen.getDisplayMatching(win.getBounds());
+    if (cursorDisplay.id !== windowDisplay.id) {
+      otherDisplayPolls++;
+      if (otherDisplayPolls >= 120) { // ~4s at 33ms
+        otherDisplayPolls = 0;
+        win.setBounds(cursorDisplay.workArea);
+        applyOverlayFlags();
+        sendToGoose('work-area', cursorDisplay.workArea);
+        sendToGoose('window-moved', win.getBounds());
+        sendToGoose('space-changed', {}); // cue the catch-up sprint
+      }
+    } else {
+      otherDisplayPolls = 0;
+    }
   }, 33);
 
   const onDisplayChange = () => {
-    if (win && !win.isDestroyed()) win.setBounds(workArea());
-    sendToGoose('work-area', workArea());
-    if (win && !win.isDestroyed()) sendToGoose('window-moved', win.getBounds());
+    if (!win || win.isDestroyed()) return;
+    // Stay on the display we're on if it still exists; else fall back to primary.
+    const wa = screen.getDisplayMatching(win.getBounds()).workArea;
+    win.setBounds(wa);
+    applyOverlayFlags();
+    sendToGoose('work-area', wa);
+    sendToGoose('window-moved', win.getBounds());
   };
 
   // Space switches: re-assert overlay flags (macOS can drop the on-top level)
@@ -216,6 +256,13 @@ app.whenReady().then(() => {
   envMonitor = new EnvMonitor((env) => sendToGoose('env', env));
   envMonitor.start();
 
+  // Auto-update from GitHub releases; the goose announces downloads itself.
+  updater = new Updater({
+    onStatus: () => {}, // panel pulls state via panel:get
+    onSpeak: (text) => sendToGoose('speak', { text }),
+  });
+  updater.start();
+
   // …and, when allowed, your calendar.
   if (process.platform === 'darwin') {
     new CalendarWatcher({
@@ -238,6 +285,8 @@ ipcMain.handle('panel:get', () => ({
   blocklist: loadBlocklist(),
   meter: gooseState.meter,
   tier: gooseState.tier,
+  appVersion: app.getVersion(),
+  update: updater ? updater.state : { status: 'dev' },
 }));
 
 ipcMain.on('panel:set', (_e, partial) => {
@@ -285,6 +334,9 @@ ipcMain.on('panel:set-blocklist', (_e, bl) => {
 ipcMain.on('panel:apologize', () => sendToGoose('apologize', {}));
 
 ipcMain.on('r:open-panel', () => openPanel());
+
+ipcMain.on('panel:check-updates', () => updater && updater.check());
+ipcMain.on('panel:install-update', () => updater && updater.install());
 
 // Failsafe: solid mode must be continuously renewed by the renderer, so a
 // missed IPC or a hung renderer can never leave the overlay blocking real
@@ -336,7 +388,7 @@ ipcMain.handle('r:get-state', () => {
     saveSettings(settings);
   }
   return {
-    workArea: workArea(),
+    workArea: currentWorkArea(),
     windowBounds: win ? win.getBounds() : null,
     settings,
     phrases: loadNotes(),

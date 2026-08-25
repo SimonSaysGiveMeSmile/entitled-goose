@@ -10,12 +10,14 @@ const DEFAULTS = {
   footsteps: false, // quiet webbed taps on foot plants (off: they get old fast)
   fps: 120, // max frame rate cap (actual rate limited by the display)
   energy: 50, // 0-100: high = fast and restless, low = slow and sleepy
+  shushUntil: 0, // epoch ms; goose stays quiet until then
   scale: 170, // goose standing height in px
   awareness: {
     battery: true, // battery warnings
     time: true, // time-of-day greetings, absence counting, late-night judgment
     reports: true, // unsolicited status reports
     calendar: false, // event reminders (prompts for Calendar automation permission)
+    phone: true, // 'you're on your phone, aren't you' suspicion honks
   },
 };
 

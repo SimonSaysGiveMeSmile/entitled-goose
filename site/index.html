@@ -128,25 +128,18 @@
     background:
       repeating-linear-gradient(90deg, transparent 0 120px, rgba(69, 120, 95, 0.05) 120px 121px);
   }
-  .walker {
+  .stage-goose {
     position: absolute;
-    bottom: 14px;
-    left: -160px;
-    animation: cross 26s linear infinite;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    cursor: pointer;
   }
-  .walker svg { display: block; animation: waddle 0.55s ease-in-out infinite; transform-origin: 50% 88%; }
-  @keyframes cross {
-    from { transform: translateX(0); }
-    to { transform: translateX(calc(100vw + 340px)); }
+  .stage-goose svg { display: block; animation: idlebob 3.2s ease-in-out infinite; }
+  @keyframes idlebob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
   }
-  @keyframes waddle {
-    0%, 100% { transform: rotate(2.4deg) translateY(0); }
-    50% { transform: rotate(-2.4deg) translateY(-2.5px); }
-  }
-  .foot-a { animation: stepA 0.55s ease-in-out infinite; transform-origin: top; }
-  .foot-b { animation: stepB 0.55s ease-in-out infinite; transform-origin: top; }
-  @keyframes stepA { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
-  @keyframes stepB { 0%,100% { transform: translateY(-7px) } 50% { transform: translateY(0) } }
   .blink { animation: blink 5.2s infinite; }
   @keyframes blink { 0%, 96%, 100% { transform: scaleY(1) } 97.5% { transform: scaleY(0.1) } }
 
@@ -234,32 +227,27 @@
   </script>
 </section>
 
-<div class="pond" aria-hidden="true">
-  <div class="walker">
-    <svg width="220" height="180" viewBox="0 0 220 180">
-      <!-- feet -->
-      <g class="foot-b">
-        <path d="M118 148 L121 168 L104 174 L126 174 L121 168" stroke="#df7a2b" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<div class="pond">
+  <div class="stage-goose" id="stage-goose" title="the goose is watching your cursor — click to honk">
+    <svg id="gooseSvg" width="220" height="185" viewBox="0 0 220 185">
+      <ellipse cx="100" cy="176" rx="72" ry="5" fill="rgba(39,39,37,0.10)"/>
+      <path d="M102 152 L100 170 L84 176 L108 176 L100 170" stroke="#f58731" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M120 152 L123 171 L107 177 L131 177 L123 171" stroke="#df7a2b" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path fill="#ececec" d="M156 120
+        C 156 142 132 156 104 156
+        C 76 156 52 148 44 132
+        C 36 116 30 96 22 74
+        C 44 88 68 88 96 90
+        C 128 92 156 98 156 120 Z"/>
+      <path fill="#dadada" opacity="0.5" d="M60 144 C 80 154 110 156 128 150 C 110 156 76 156 60 144 Z"/>
+      <path id="g-neck" fill="none" stroke="#ececec" stroke-width="16" stroke-linecap="round" d="M138 116 Q 146 78 148 44"/>
+      <g id="g-head">
+        <g id="g-beak" transform="translate(13,-2)">
+          <path fill="#f58731" d="M 0 -6 Q 20 -5 26 1 Q 19 7 0 6 Z"/>
+        </g>
+        <ellipse fill="#ececec" cx="0" cy="0" rx="15.5" ry="12.5"/>
+        <circle class="blink" fill="#272725" cx="4" cy="-4" r="2.6"/>
       </g>
-      <g class="foot-a">
-        <path d="M102 148 L100 170 L84 176 L108 176 L100 170" stroke="#f58731" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-      <!-- body: long teardrop with raised tail spike (drawn facing right) -->
-      <path fill="#ececec" d="M156 116
-        C 156 138 132 152 104 152
-        C 76 152 52 144 44 128
-        C 36 112 30 92 22 70
-        C 44 84 68 84 96 86
-        C 128 88 156 94 156 116 Z"/>
-      <path fill="#dadada" opacity="0.5" d="M60 140 C 80 150 110 152 128 146 C 110 152 76 152 60 140 Z"/>
-      <!-- neck -->
-      <path d="M138 112 C 146 84 142 62 146 44" stroke="#ececec" stroke-width="15" fill="none" stroke-linecap="round"/>
-      <!-- head -->
-      <ellipse fill="#ececec" cx="150" cy="38" rx="15.5" ry="12.5"/>
-      <!-- beak -->
-      <path fill="#f58731" d="M163 33 Q 180 36 184 40 Q 179 45 163 44 Z"/>
-      <!-- eye -->
-      <circle class="blink" fill="#272725" cx="153" cy="34" r="2.6"/>
     </svg>
   </div>
 </div>
@@ -347,8 +335,71 @@ for (const id of ['honk-btn', 'honk-title']) {
   document.getElementById(id).addEventListener('click', (e) => {
     honk();
     burst(e.clientX, e.clientY);
+    if (window.gooseBeakHonk) window.gooseBeakHonk();
   });
 }
+</script>
+<script>
+/* Interactive goose: the neck tracks your cursor with saccadic snaps — the
+   same motion the desktop goose uses. Click it (or the HONK button) to honk. */
+(function () {
+  const svg = document.getElementById('gooseSvg');
+  const neck = document.getElementById('g-neck');
+  const headG = document.getElementById('g-head');
+  const beakG = document.getElementById('g-beak');
+  const shoulder = { x: 138, y: 116 };
+  const REST = { x: 149, y: 40 };
+  const REACH = 82;
+  let head = { ...REST };
+  let target = { ...REST };
+  let lastRetarget = { x: 0, y: 0 };
+  let honkT = 0;
+  let lastT = performance.now();
+
+  function svgPoint(cx, cy) {
+    const r = svg.getBoundingClientRect();
+    return { x: (cx - r.left) * (220 / r.width), y: (cy - r.top) * (185 / r.height) };
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    const p = svgPoint(e.clientX, e.clientY);
+    if (Math.hypot(p.x - lastRetarget.x, p.y - lastRetarget.y) < 14) return;
+    lastRetarget = p;
+    let dx = p.x - shoulder.x;
+    let dy = p.y - shoulder.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const r = Math.min(d, REACH);
+    target = {
+      x: shoulder.x + (dx / d) * r,
+      y: Math.min(shoulder.y + (dy / d) * r, shoulder.y + 24),
+    };
+  });
+
+  function tick(now) {
+    requestAnimationFrame(tick);
+    const dt = Math.min((now - lastT) / 1000, 0.05);
+    lastT = now;
+    const k = 1 - Math.pow(2, -dt / 0.045);
+    head.x += (target.x - head.x) * k;
+    head.y += (target.y - head.y) * k;
+    const mx = (shoulder.x + head.x) / 2 - (head.y - shoulder.y) * 0.13;
+    const my = (shoulder.y + head.y) / 2 + (head.x - shoulder.x) * 0.10;
+    neck.setAttribute('d', `M ${shoulder.x} ${shoulder.y} Q ${mx} ${my} ${head.x} ${head.y}`);
+    const ang = Math.max(-13, Math.min(13, (Math.atan2(head.y - shoulder.y, head.x - shoulder.x) + Math.PI / 2) * 9));
+    honkT = Math.max(0, honkT - dt);
+    const open = honkT > 0.25 ? 1 : honkT / 0.25;
+    headG.setAttribute('transform', `translate(${head.x + 2}, ${head.y - 3}) rotate(${ang})`);
+    beakG.setAttribute('transform', `translate(13,-2) rotate(${-open * 15})`);
+  }
+  requestAnimationFrame(tick);
+
+  window.gooseBeakHonk = function () { honkT = 0.45; };
+  document.getElementById('stage-goose').addEventListener('click', function (e) {
+    honkT = 0.45;
+    if (typeof honk === 'function') honk();
+    if (typeof burst === 'function') burst(e.clientX, e.clientY);
+  });
+})();
 </script>
 </body>
 </html>

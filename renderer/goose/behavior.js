@@ -50,7 +50,8 @@ export class Behavior {
     this.envCooldowns = {}; // key → seconds remaining
     this.wasIdleSeconds = 0;
     // Per-category toggles, mirrored from settings via the control panel.
-    this.awareness = { battery: true, time: true, reports: true, calendar: false };
+    this.awareness = { battery: true, time: true, reports: true, calendar: false, phone: true };
+    this.shushUntil = 0; // epoch ms from settings
     this.energy = 50; // 0-100 from settings: restless vs sleepy
     this.calendarEvents = [];
     this.calendarReminded = new Set();
@@ -80,6 +81,10 @@ export class Behavior {
   gooseDistToCursor() {
     const b = this.anim;
     return Math.hypot(this.cursor.x - b.bodyX, this.cursor.y - (b.bodyY - b.S * 0.5));
+  }
+
+  get shushed() {
+    return Date.now() < this.shushUntil;
   }
 
   get isNight() {
@@ -115,6 +120,16 @@ export class Behavior {
     if (this.calendarReminded.size > 80) this.calendarReminded.clear();
   }
 
+  onWorkAreaChange(wa) {
+    this.workArea = wa;
+    this._batteryIcon = null; // the menu bar moved with the display
+    if (this.task && this.task.name !== 'catchup') {
+      this.task = null; // its target lives on the old display
+      this.resetIntent();
+      this.gapT = 1.0;
+    }
+  }
+
   onMenuPos(item, pos) {
     if (item === 'battery' && pos) this._batteryIcon = pos;
   }
@@ -139,6 +154,17 @@ export class Behavior {
     }
 
     const asleep = this.task?.name === 'sleep';
+    if (this.shushed) {
+      // A shushed goose holds its tongue — except for a dying battery.
+      this.envEvents.length = 0;
+      this.wasIdleSeconds = 0; // absences during shush go unremarked
+      const pct = this.env.batteryPct;
+      if (this.awareness.battery && pct != null && !this.env.charging
+          && pct <= 5 && this.envCooldownOk('battery5', 300)) {
+        this.startBatteryAnnounce('FIVE PERCENT. shush revoked. do something.', true);
+      }
+      return;
+    }
     const wake = () => { if (this.task?.name === 'sleep') { this.task = null; this.gapT = 1.5; this.resetIntent(); } };
 
     while (this.envEvents.length) {
@@ -181,6 +207,19 @@ export class Behavior {
           : `'${ev.title}' in ${ev.minutesUntil} minutes. go be a person.`);
         this.anim.startAction('honk', { volume: 0.5, target: this.cursor });
       }
+    }
+
+    // The phone suspicion: mouse untouched for minutes while the machine is
+    // awake in daytime. The goose knows exactly what you're doing.
+    if (this.awareness.phone && !asleep
+        && this.userIdleT >= 240
+        && this.env.idleSeconds >= 240 && this.env.idleSeconds <= 540
+        && this.env.hour >= 9 && this.env.hour < 23
+        && this.envCooldownOk('phone', 1800)) {
+      const mins = Math.round(this.env.idleSeconds / 60);
+      this.events.speak(`${mins} minutes without touching the mouse. you're on your phone, aren't you. the computer is RIGHT HERE.`);
+      this.anim.startAction('honk', { volume: this.honkVolume(), target: this.cursor });
+      this.meter = clamp(this.meter + 0.04, 0, 1);
     }
 
     // Returned after an at-desk absence (no sleep/lock event involved).
@@ -354,6 +393,7 @@ export class Behavior {
     // Ambient awareness shapes the deck: at night (or while you're away) the
     // goose mostly sleeps and doesn't demand; status reports surface rarely.
     const drowsy = this.isNight || this.env.idleSeconds > 240;
+    const QUIET = new Set(['wander', 'idle', 'sleep']);
     const entries = Object.entries({ ...WEIGHTS, report: [0.05, 0.06, 0.06, 0.04] })
       .map(([name, w]) => {
         let weight = name === this.lastTaskName ? w[t] * 0.25 : w[t];
@@ -366,6 +406,7 @@ export class Behavior {
         return [name, weight];
       })
       .filter(([name, w]) => w > 0 && !(this.polite && name === 'demand'))
+      .filter(([name]) => !this.shushed || QUIET.has(name))
       .filter(([name]) => name !== 'report' || this.awareness.reports)
       .filter(([name]) => (name !== 'speak' && name !== 'report') || this.speakCooldown <= 0);
     let total = entries.reduce((a, [, w]) => a + w, 0);
@@ -451,7 +492,7 @@ export class Behavior {
             if (B.gooseDistToCursor() < 130) {
               B.meter = clamp(B.meter + 0.06, 0, 1);
               B.intent.sleep = false;
-              if (B.isNight) {
+              if (B.shushed) { /* silently resettles */ } else if (B.isNight) {
                 if (B.envCooldownOk('grumble', 60)) B.events.speak('I was ASLEEP.');
               } else {
                 A.startAction('honk', { volume: B.honkVolume(), target: B.cursor });
@@ -655,7 +696,7 @@ export class Behavior {
                 return false;
               }
               arrived = true;
-              if (Math.random() < 0.25) B.events.speak('nice try.');
+              if (!B.shushed && Math.random() < 0.25) B.events.speak('nice try.');
             }
             settleT -= dt;
             B.intent.lookAt = B.cursor;
@@ -690,6 +731,13 @@ export class Behavior {
               phase = 'peck';
             }
             if (phase === 'peck') {
+              if (B.shushed) {
+                // Shushed enforcement still protects focus — wordlessly.
+                B.events.closeDistraction(opts.id);
+                B.meter = clamp(B.meter - 0.08, 0, 1);
+                phase = 'gloat';
+                return false;
+              }
               cooldown -= dt;
               B.intent.lookAt = btn;
               if (!warned && !A.busy && cooldown <= 0) {
