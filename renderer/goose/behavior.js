@@ -6,6 +6,8 @@
 
 import { clamp } from '../../shared/spring.js';
 
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
 export const TIERS = ['content', 'miffed', 'indignant', 'wrath'];
 
 //                       content miffed indignant wrath
@@ -95,19 +97,19 @@ export class Behavior {
     const c = [];
     const add = (key, w, t) => { if (w > 0 && !this.recentRemarks.includes(key)) c.push({ key, w, t }); };
 
-    if (this.front.app && mins >= 20) add('appDwell', 3, `{appMin} minutes in {app}. I've seen enough.`);
-    if (this.front.app && mins >= 45) add('appDwellLong', 4, `we have lived in {app} for {appMin} minutes. blink twice if you need help.`);
-    if (e.batteryPct != null && !e.charging && e.batteryPct <= 35) add('batt', 3, `{battery}% battery and no charger in sight. thrilling.`);
-    if (e.charging) add('charging', 1.5, `charging. finally, someone listens.`);
-    if (e.uptimeMinutes > 72 * 60) add('uptime', 2, `this machine has been awake {uptimeH} hours. neither of us is okay.`);
-    if (this.stats.tabsClosed > 0) add('kills', 2, `tabs closed on your behalf today: {tabsClosed}. you're welcome.`);
-    if (this.stats.cursorPx > 350000) add('miles', 2.5, `your cursor has traveled {miles} meters today. not once toward me.`);
-    if (e.weekday === 1 && e.hour < 12) add('monday', 2, `monday. even I feel it, and I'm a goose.`);
-    if ((e.weekday === 0 || e.weekday === 6) && e.idleSeconds < 60) add('weekend', 2, `working on a {day}. the pond misses you.`);
-    if (e.hour >= 12 && e.hour < 13) add('lunch', 1.5, `it is lunchtime. you get bread. think of me.`);
-    if (this.tier >= 2) add('mood', 2, `for the record, I have been {tier} for a while now.`);
-    if (Date.now() - this.sessionStart > 3 * 3600_000) add('session', 2, `{sessionMin} minutes together today and not one crumb of bread.`);
-    if (this.stats.pokes > 2) add('pokes', 2, `you have poked me ${this.stats.pokes} times today. I keep records.`);
+    if (this.front.app && mins >= 20) add('appDwell', 3, [`{appMin} minutes in {app}. I've seen enough.`, `still {app}. minute {appMin}. fascinating.`, `{app} again. {appMin} minutes. I am documenting this.`]);
+    if (this.front.app && mins >= 45) add('appDwellLong', 4, [`we have lived in {app} for {appMin} minutes. blink twice if you need help.`, `{appMin} minutes. {app} should be paying you rent.`, `day 1 in {app}. morale: mine is low. ({appMin} minutes.)`]);
+    if (e.batteryPct != null && !e.charging && e.batteryPct <= 35) add('batt', 3, [`{battery}% battery and no charger in sight. thrilling.`, `{battery}%. I am not saying panic. I am honking it.`, `the machine is at {battery}%. one of us should care.`]);
+    if (e.charging) add('charging', 1.5, [`charging. finally, someone listens.`, `plugged in. a rare display of responsibility.`]);
+    if (e.uptimeMinutes > 72 * 60) add('uptime', 2, [`this machine has been awake {uptimeH} hours. neither of us is okay.`, `{uptimeH} hours without a restart. bold. reckless, even.`]);
+    if (this.stats.tabsClosed > 0) add('kills', 2, [`tabs closed on your behalf today: {tabsClosed}. you're welcome.`, `{tabsClosed} distractions eliminated today. gratitude accepted in crumbs.`]);
+    if (this.stats.cursorPx > 350000) add('miles', 2.5, [`your cursor has traveled {miles} meters today. not once toward me.`, `{miles} meters of cursor travel. zero visits. noted.`]);
+    if (e.weekday === 1 && e.hour < 12) add('monday', 2, [`monday. even I feel it, and I'm a goose.`, `it is monday. adjust expectations accordingly.`]);
+    if ((e.weekday === 0 || e.weekday === 6) && e.idleSeconds < 60) add('weekend', 2, [`working on a {day}. the pond misses you.`, `a {day}, and you're here. commendable. concerning.`]);
+    if (e.hour >= 12 && e.hour < 13) add('lunch', 1.5, [`it is lunchtime. you get bread. think of me.`, `lunch hour. somewhere, bread is happening without me.`]);
+    if (this.tier >= 2) add('mood', 2, [`for the record, I have been {tier} for a while now.`, `current status: {tier}. this is on you.`]);
+    if (Date.now() - this.sessionStart > 3 * 3600_000) add('session', 2, [`{sessionMin} minutes together today and not one crumb of bread.`, `{sessionMin} minutes of my company today. invoice pending.`]);
+    if (this.stats.pokes > 2) add('pokes', 2, [`you have poked me ${this.stats.pokes} times today. I keep records.`, `poke #${this.stats.pokes} has been logged with my lawyer (also a goose).`]);
     // The pool is exempt from the recent-remark filter: it is the guaranteed
     // fallback, and dedupe there is the deck's job. Filtering it empties the
     // candidate list on quiet systems and there is nothing left to say.
@@ -122,7 +124,8 @@ export class Behavior {
       this.recentRemarks.push(chosen.key);
       if (this.recentRemarks.length > 6) this.recentRemarks.shift();
     }
-    return this.renderPhrase(chosen.t == null ? this.poolDraw() : chosen.t);
+    const t = Array.isArray(chosen.t) ? pick(chosen.t) : chosen.t;
+    return this.renderPhrase(t == null ? this.poolDraw() : t);
   }
 
   // Phrase templates: {time} becomes a time 1-3 hours ago, so "honk was sent
@@ -263,22 +266,22 @@ export class Behavior {
       if (!this.awareness.time) continue;
       if ((event === 'resume' || event === 'unlock') && this.envCooldownOk('greet', 120)) {
         const h = this.env.hour;
-        let line = h < 6 ? 'it is the middle of the night. bold of us.'
-          : h < 12 ? 'good morning. the bread situation remains unresolved.'
-          : h < 18 ? 'welcome back. I saw nothing.'
-          : 'evening. I kept everything exactly as you left it. mostly.';
+        let line = h < 6 ? pick(['it is the middle of the night. bold of us.', 'nocturnal, are we. the pond judges silently. I do it out loud.'])
+          : h < 12 ? pick(['good morning. the bread situation remains unresolved.', 'morning. I have been awake for hours. someone had to hold the fort.'])
+          : h < 18 ? pick(['welcome back. I saw nothing.', 'back again. the desktop held. you are welcome.'])
+          : pick(['evening. I kept everything exactly as you left it. mostly.', 'good evening. the day was long. I supervised.']);
         // Fold the counted absence into the greeting so it is never lost.
         if (this.wasIdleSeconds > 600) {
           const mins = Math.round(this.wasIdleSeconds / 60);
           this.wasIdleSeconds = 0;
-          line += ` you were gone ${mins} minutes. I counted.`;
+          line += pick([` you were gone ${mins} minutes. I counted.`, ` ${mins} minutes of absence, logged and notarized.`]);
           this.meter = clamp(this.meter + Math.min(0.15, mins * 0.004), 0, 1);
         }
         wake();
         this.events.speak(line);
         this.anim.startAction('honk', { volume: 0.4, target: this.cursor });
       } else if (event === 'on-battery' && !asleep && this.envCooldownOk('power', 600)) {
-        this.events.speak('unplugged, are we. living dangerously.');
+        this.events.speak(pick(['unplugged, are we. living dangerously.', 'running on battery. how bohemian.']));
       } else if (event === 'theme' && !asleep && this.envCooldownOk('theme', 1800)) {
         this.events.speak(this.env.dark ? 'dark mode. moody.' : 'light mode. blinding. thanks.');
       }
@@ -308,7 +311,7 @@ export class Behavior {
         && this.env.hour >= 9 && this.env.hour < 23
         && this.envCooldownOk('phone', 1800)) {
       const mins = Math.round(this.env.idleSeconds / 60);
-      this.events.speak(`${mins} minutes without touching the mouse. you're on your phone, aren't you. the computer is RIGHT HERE.`);
+      this.events.speak(pick([`${mins} minutes without touching the mouse. you're on your phone, aren't you. the computer is RIGHT HERE.`, `${mins} minutes of mouse silence. blink if the phone has taken you hostage.`]));
       this.anim.startAction('honk', { volume: this.honkVolume(), target: this.cursor });
       this.meter = clamp(this.meter + 0.04, 0, 1);
     }
@@ -319,7 +322,7 @@ export class Behavior {
         const mins = Math.round(this.wasIdleSeconds / 60);
         this.wasIdleSeconds = 0;
         wake();
-        this.events.speak(`you were gone ${mins} minutes. I counted.`);
+        this.events.speak(pick([`you were gone ${mins} minutes. I counted.`, `${mins} minutes away. the desk reported nothing. I reported honk.`]));
         this.meter = clamp(this.meter + Math.min(0.15, mins * 0.004), 0, 1);
       }
     } else if (this.env.idleSeconds < 10 && this.wasIdleSeconds < 600) {
@@ -341,13 +344,13 @@ export class Behavior {
     // Machine under strain: sympathy, of a sort. (load1 is null on Windows.)
     if (this.awareness.time && this.env.load1 != null && this.env.load1 > this.env.cpus * 1.5
         && !asleep && this.envCooldownOk('load', 900)) {
-      this.events.speak('your computer is wheezing. what did you do.');
+      this.events.speak(pick(['your computer is wheezing. what did you do.', 'the fans are screaming. I relate to them deeply.']));
     }
 
     // Deep night with the user still typing: judgment.
     if (this.awareness.time && this.isNight && this.env.hour >= 1 && this.env.hour < 5 && !asleep
         && this.env.idleSeconds < 30 && this.envCooldownOk('latenight', 1800)) {
-      this.events.speak(`it is ${this.timeString()}. even geese sleep. this is unwell.`);
+      this.events.speak(pick([`it is ${this.timeString()}. even geese sleep. this is unwell.`, `${this.timeString()}. the only creatures awake right now are you, me, and regret.`]));
     }
   }
 
@@ -373,7 +376,7 @@ export class Behavior {
     this.anim.poke();
     this.task = null;
     this.gapT = 1.0;
-    if (this.tier >= 2) this.events.speak('excuse me??');
+    if (this.tier >= 2) this.events.speak(pick(['excuse me??', 'HANDS.', 'that is assault, technically.']));
   }
 
   onPet() {
@@ -381,7 +384,7 @@ export class Behavior {
     this.meter = clamp(this.meter - 0.28, 0, 1);
     this.task = null;
     this.gapT = 2.5; // stands there, appeased
-    if (Math.random() < 0.4) this.events.speak('hm. acceptable.');
+    if (Math.random() < 0.4) this.events.speak(pick(['hm. acceptable.', 'continue.', 'this changes nothing. (do it again.)']));
   }
 
   onDragStart() {
@@ -394,7 +397,7 @@ export class Behavior {
     // Set down (or dropped): indignant honk back at the hand that held it.
     this.meter = clamp(this.meter + 0.10, 0, 1);
     this.anim.startAction('honk', { volume: Math.min(1, this.honkVolume() + 0.2), target: this.cursor });
-    if (Math.random() < 0.45) this.events.speak('we do NOT do that.');
+    if (Math.random() < 0.45) this.events.speak(pick(['we do NOT do that.', 'I am a goose, not luggage.']));
     this.gapT = 1.8;
   }
 
@@ -430,11 +433,11 @@ export class Behavior {
 
   onApologize() {
     this.meter = 0;
-    setTimeout(() => this.events.speak('I forgive you. (for what you did.)'), 2500);
+    setTimeout(() => this.events.speak(pick(['I forgive you. (for what you did.)', 'apology received. penance: bread.'])), 2500);
   }
 
   deliverGrudge() {
-    this.events.speak('I noticed you tried to evict me. bold.');
+    this.events.speak(pick(['I noticed you tried to evict me. bold.', 'you closed me. I came back. reflect on that.']));
     this.meter = clamp(this.meter + 0.2, 0, 1);
   }
 
@@ -477,7 +480,9 @@ export class Behavior {
       this.gapT -= dt;
       this.resetIntent();
       // Between tasks the goose idly watches the cursor if it is nearby.
-      this.intent.lookAt = gooseDist < 330 ? this.cursor : null;
+      // Site behavior: the standing goose watches the cursor constantly,
+      // at any distance — the always-tracking neck IS the character.
+      this.intent.lookAt = this.cursor;
       if (this.gapT <= 0 && !this.anim.busy) {
         this.task = this.pickTask();
       }
@@ -583,7 +588,7 @@ export class Behavior {
         return {
           name, update(dt) {
             t -= dt;
-            B.intent.lookAt = B.gooseDistToCursor() < 330 ? B.cursor : null;
+            B.intent.lookAt = B.cursor; // always-tracking, like the site
             return t <= 0;
           },
         };
@@ -600,7 +605,7 @@ export class Behavior {
               B.meter = clamp(B.meter + 0.06, 0, 1);
               B.intent.sleep = false;
               if (B.shushed) { /* silently resettles */ } else if (B.isNight) {
-                if (B.envCooldownOk('grumble', 60)) B.events.speak('I was ASLEEP.');
+                if (B.envCooldownOk('grumble', 60)) B.events.speak(pick(['I was ASLEEP.', 'five more minutes. or years.']));
               } else {
                 A.startAction('honk', { volume: B.honkVolume(), target: B.cursor });
               }
@@ -805,7 +810,7 @@ export class Behavior {
                 return false;
               }
               arrived = true;
-              if (!B.shushed && Math.random() < 0.25) B.events.speak('nice try.');
+              if (!B.shushed && Math.random() < 0.25) B.events.speak(pick(['nice try.', 'blocked. again. we learn nothing.']));
             }
             settleT -= dt;
             B.intent.lookAt = B.cursor;
@@ -869,7 +874,7 @@ export class Behavior {
                   B.events.closeDistraction(opts.id);
                   B.stats.tabsClosed++;
                   B.meter = clamp(B.meter - 0.08, 0, 1); // enforcement is satisfying
-                  B.events.speak(`closed your ${opts.label || 'distraction'}. you're welcome.`);
+                  B.events.speak(pick([`closed your ${opts.label || 'distraction'}. you're welcome.`, `${opts.label || 'that'}: handled. focus restored. tip jar accepts bread.`]));
                   phase = 'gloat';
                 }
               }

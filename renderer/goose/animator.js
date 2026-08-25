@@ -346,9 +346,11 @@ export class GooseAnimator {
       // (verified against the body bezier; lower floors bury the head when
       // the cursor hovers the goose). Near the root, direction is noise —
       // hold the last look instead of whipping around the shoulder.
-      const r = clamp(d, 0.30 * S, 0.42 * S);
+      const r = clamp(d, 0.30 * S, 0.33 * S);
       let tx = root.x + (dx / d) * r;
-      let ty = Math.min(root.y + (dy / d) * r, this.bodyY - 0.16 * S);
+      // Site head-dip clamp (shoulder.y + 24 at REACH 82): gaze goes down,
+      // the head itself stays up — pecks reach lower via the action branch.
+      let ty = Math.min(root.y + (dy / d) * r, root.y + 0.29 * r);
       const retarget = !this.lastLookTarget
         || (d > 0.10 * S && Math.hypot(tx - this.lastLookTarget.x, ty - this.lastLookTarget.y) > 0.082 * S);
       if (retarget) this.lastLookTarget = { x: tx, y: ty };
@@ -426,7 +428,7 @@ export class GooseAnimator {
     let uy = tip.y - prev.y;
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
-    const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.18, -0.30, 0.30);
+    const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.157, -0.227, 0.227);
     this.headDrawWX = this.bodyX + (tip.x + ux * 0.012) * S * this.facing;
     this.headDrawWY = this.bodyY + (tip.y + uy * 0.012) * S;
 
@@ -500,7 +502,7 @@ export class GooseAnimator {
       tailWag: this.tailWag * 0.05,
       neckPts: this.neckPts,
       head: { x: tip.x + ux * 0.012, y: tip.y + uy * 0.012 },
-      headAngle: clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.18, -0.30, 0.30),
+      headAngle: clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.157, -0.227, 0.227),
       beakOpen: this.beakOpen,
       eyelid: 0,
       faceCamera: 0,

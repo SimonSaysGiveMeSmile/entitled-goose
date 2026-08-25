@@ -45,6 +45,22 @@ const DEFAULT_NOTES = [
   'consider this your final warning. (warning #47)',
 ];
 
+// Phrases introduced after v2 shipped. Migrations union ONLY the batch a
+// user has not seen yet — re-unioning the whole default list would
+// resurrect phrases they deliberately deleted.
+const NOTES_V3 = [
+  'the pond situation remains unaddressed.',
+  'I have seen your screen time. we both know.',
+  "today's agenda: honk. tomorrow: honk (continued).",
+  'somewhere a farmer is missing his best goose. not me. I chose this.',
+  'your keyboard is 4% crumbs. none were offered to me.',
+  'I have drafted a formal complaint. it says honk.',
+  'be advised: I have opinions about that font.',
+  'this concludes my patrol. beginning next patrol.',
+  'you may pet the goose. this is not a request.',
+  'attendance has been taken. it is just us. again.',
+];
+
 function settingsPath() {
   return path.join(app.getPath('userData'), 'settings.json');
 }
@@ -96,11 +112,16 @@ export function loadNotes(liveSettings = null) {
       // One-time migration: older installs were seeded with only the first 8
       // phrases and the saved file shadows newer defaults — union them in,
       // and retire the static-time joke for the dynamic {time} version.
-      if ((settings.notesVersion || 1) < 2) {
-        const merged = notes.filter((n) => n !== 'honk was sent at 9:04. it is now much later.');
-        for (const n of DEFAULT_NOTES) if (!merged.includes(n)) merged.push(n);
+      const v = settings.notesVersion || 1;
+      if (v < 3) {
+        let merged = notes;
+        if (v < 2) {
+          merged = merged.filter((n) => n !== 'honk was sent at 9:04. it is now much later.');
+          for (const n of DEFAULT_NOTES) if (!merged.includes(n)) merged.push(n);
+        }
+        for (const n of NOTES_V3) if (!merged.includes(n)) merged.push(n);
         fs.writeFileSync(notesPath(), JSON.stringify(merged, null, 2));
-        settings.notesVersion = 2;
+        settings.notesVersion = 3;
         saveSettings(settings);
         return merged;
       }
@@ -111,11 +132,13 @@ export function loadNotes(liveSettings = null) {
   }
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
-    fs.writeFileSync(notesPath(), JSON.stringify(DEFAULT_NOTES, null, 2));
-    settings.notesVersion = 2;
+    const seed = [...DEFAULT_NOTES, ...NOTES_V3];
+    fs.writeFileSync(notesPath(), JSON.stringify(seed, null, 2));
+    settings.notesVersion = 3;
     saveSettings(settings);
+    return seed;
   } catch (err) {
     console.error('notes seed failed', err);
   }
-  return DEFAULT_NOTES;
+  return [...DEFAULT_NOTES, ...NOTES_V3];
 }

@@ -108,7 +108,7 @@ function drawNeck(ctx, pts, color) {
   // A ribbon polygon's flat end edge can poke past the rotated head at
   // extreme angles (lowest head position). A round line cap is a semicircle
   // centered on the stroke end, and the end is TRIMMED 0.014 short of the
-  // chain tip so cap radius (0.046) + head-center offset (~0.025) always
+  // chain tip so cap radius (0.042) + head-center offset (~0.025) always
   // stays inside the drawn head ellipse (0.072x0.056) at any rotation.
   const samples = sampleCatmullRom(rooted, 20);
   const n = samples.length;
@@ -118,7 +118,7 @@ function drawNeck(ctx, pts, color) {
   end.x -= ((end.x - prev2.x) / el) * 0.014;
   end.y -= ((end.y - prev2.y) / el) * 0.014;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 0.092;
+  ctx.lineWidth = 0.084;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
