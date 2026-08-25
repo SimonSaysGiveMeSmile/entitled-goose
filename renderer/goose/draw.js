@@ -91,10 +91,9 @@ function drawFoot(ctx, ankle, droop, color) {
   ctx.restore();
 }
 
-// Smooth ribbon through neck chain points with a tapered width profile.
-// The chain is extended one phantom point INTO the body so the base never
-// shows a raw edge, and the tip gets a round cap that buries itself in the
-// head — no visible seams at any reach angle.
+// Neck as a stroked path with round caps — the landing page's exact
+// construction (stroke-width 16, linecap round). The chain is extended one
+// phantom point INTO the body so the base cap stays buried.
 function drawNeck(ctx, pts, color) {
   const first = pts[0];
   // The phantom root anchors INTO the body interior (down-back of the neck
@@ -106,36 +105,20 @@ function drawNeck(ctx, pts, color) {
     { x: first.x - 0.07, y: first.y + 0.05 },
     ...pts,
   ];
+  // A ribbon polygon's flat end edge can poke past the rotated head at
+  // extreme angles (lowest head position). A round line cap is a semicircle
+  // centered ON the chain tip; the head ellipse (ry 0.071) always covers cap
+  // radius (0.046) + head anchor offset (0.012) at any rotation, so no edge
+  // can ever be exposed — same invariant the site goose gets for free.
   const samples = sampleCatmullRom(rooted, 20);
-  const n = samples.length;
-  const left = [];
-  const right = [];
-  for (let i = 0; i < n; i++) {
-    const p = samples[i];
-    const prev = samples[Math.max(0, i - 1)];
-    const next = samples[Math.min(n - 1, i + 1)];
-    let tx = next.x - prev.x;
-    let ty = next.y - prev.y;
-    const len = Math.hypot(tx, ty) || 1;
-    tx /= len; ty /= len;
-    const u = i / (n - 1);
-    const hw = (0.092 - 0.008 * u) * 0.5; // near-constant, site-thick (16px @ 220-unit goose)
-    left.push({ x: p.x - ty * hw, y: p.y + tx * hw });
-    right.push({ x: p.x + ty * hw, y: p.y - tx * hw });
-  }
-  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.092;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(left[0].x, left[0].y);
-  for (let i = 1; i < n; i++) ctx.lineTo(left[i].x, left[i].y);
-  for (let i = n - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
-  ctx.closePath();
-  ctx.fill();
-
-  // Round cap at the tip, bridging into the head.
-  const tip = samples[n - 1];
-  ctx.beginPath();
-  ctx.arc(tip.x, tip.y, 0.042, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(samples[0].x, samples[0].y);
+  for (let i = 1; i < samples.length; i++) ctx.lineTo(samples[i].x, samples[i].y);
+  ctx.stroke();
 }
 
 function sampleCatmullRom(pts, per) {
