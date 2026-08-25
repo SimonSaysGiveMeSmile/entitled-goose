@@ -6,14 +6,12 @@ import { closeAllNotes } from './notes.js';
 import { FocusWarden } from './focus.js';
 import { openPanel } from './panel.js';
 import { EnvMonitor } from './env.js';
+import { CalendarWatcher } from './calendar.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Honks must be able to play without a user gesture inside the window.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-
-const WIN_W = 800;
-const WIN_H = 640;
 
 let win = null;
 let tray = null;
@@ -45,13 +43,17 @@ function sendToGoose(channel, data) {
   if (win && !win.isDestroyed()) win.webContents.send('m:' + channel, data);
 }
 
+// Static full-workArea overlay: the window NEVER moves, so the goose's motion
+// is pure canvas animation — no compositor mismatch, no jitter. Cheapness is
+// preserved by dirty-rect redraws in the renderer (only the region around the
+// goose repaints each frame).
 function createWindow() {
   const wa = workArea();
   win = new BrowserWindow({
-    x: Math.round(wa.x + wa.width / 2 - WIN_W / 2),
-    y: wa.y + wa.height - WIN_H,
-    width: WIN_W,
-    height: WIN_H,
+    x: wa.x,
+    y: wa.y,
+    width: wa.width,
+    height: wa.height,
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -84,22 +86,6 @@ function createWindow() {
     win.showInactive();
     applyOverlayFlags(); // re-assert on-top level after show (order matters on macOS)
   });
-}
-
-// The RENDERER owns follow decisions: it updates its drawing origin and orders
-// the window move in the same frame, so the goose never draws against a stale
-// origin (that mismatch showed up as intermittent flicker, worst on vertical
-// walks). Main just executes the move verbatim — clamped for safety, never
-// re-quantized, or the two sides would disagree.
-function moveWindowTo(x, y) {
-  if (!win || win.isDestroyed()) return;
-  const wa = workArea();
-  const cx = Math.min(Math.max(Math.round(x), wa.x), wa.x + wa.width - WIN_W);
-  const cy = Math.min(Math.max(Math.round(y), wa.y), wa.y + wa.height - WIN_H);
-  win.setBounds({ x: cx, y: cy, width: WIN_W, height: WIN_H });
-  // Confirm AFTER the native move so the renderer swaps its drawing origin
-  // only once the window is really there — no one-frame offset flash.
-  sendToGoose('window-moved', win.getBounds());
 }
 
 function buildTray() {
@@ -184,8 +170,9 @@ app.whenReady().then(() => {
   }, 33);
 
   const onDisplayChange = () => {
-    // Renderer re-follows on its next frame once it has the new bounds.
+    if (win && !win.isDestroyed()) win.setBounds(workArea());
     sendToGoose('work-area', workArea());
+    if (win && !win.isDestroyed()) sendToGoose('window-moved', win.getBounds());
   };
 
   // Space switches: re-assert overlay flags (macOS can drop the on-top level)
@@ -225,9 +212,18 @@ app.whenReady().then(() => {
   // The goose keeps an eye on the clock and the machine.
   envMonitor = new EnvMonitor((env) => sendToGoose('env', env));
   envMonitor.start();
-});
 
-ipcMain.on('r:move-window', (_e, { x, y }) => moveWindowTo(x, y));
+  // …and, when allowed, your calendar.
+  if (process.platform === 'darwin') {
+    new CalendarWatcher({
+      isEnabled: () => settings.awareness.calendar,
+      onEvents: (events) => sendToGoose('calendar', { events }),
+      onPermissionNeeded: () => sendToGoose('speak', {
+        text: 'I tried to read your calendar (for reminders, not gossip) but need permission. System Settings → Privacy → Automation.',
+      }),
+    }).start();
+  }
+});
 
 let gooseState = { meter: 0.15, tier: 'content' };
 ipcMain.on('r:goose-state', (_e, s) => { gooseState = s; });

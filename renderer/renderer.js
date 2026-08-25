@@ -72,6 +72,7 @@ async function boot() {
     },
   });
 
+  if (settings.awareness) behavior.awareness = { ...behavior.awareness, ...settings.awareness };
   if (pendingEnv) {
     behavior.onEnv(pendingEnv);
     pendingEnv = null;
@@ -102,9 +103,14 @@ window.goose.on('work-area', (wa) => {
 window.goose.on('settings', (s) => {
   settings = { ...settings, ...s };
   synth.muted = settings.muted;
-  if (behavior) behavior.polite = settings.polite;
+  if (behavior) {
+    behavior.polite = settings.polite;
+    if (settings.awareness) behavior.awareness = { ...behavior.awareness, ...settings.awareness };
+  }
   if (animator && settings.scale) animator.S = settings.scale;
 });
+
+window.goose.on('calendar', ({ events }) => behavior && behavior.onCalendar(events));
 
 window.goose.on('apologize', () => behavior && behavior.onApologize());
 
@@ -215,60 +221,17 @@ window.addEventListener('blur', () => { if (dragging) endDrag(); });
 // The drawing origin updates in the SAME frame the move is ordered, so the
 // goose never draws against a window position it doesn't have yet. Coarse
 // quantized steps keep moves infrequent.
-// Window follow: GLIDE, don't jump. Once the goose leaves the comfort zone the
-// window slides after it in small capped steps (≤18px per move, ≤30Hz), with
-// hysteresis so it settles once the goose is comfortably framed again. One
-// move in flight at a time: the drawing origin only swaps when main confirms
-// the native move, so any mismatch is a single ≤18px frame — imperceptible —
-// instead of the old one-shot ~200px recenter flash.
-const MAX_STEP = 18;
-const START_SLACK_X = 190;
-const START_SLACK_Y = 100;
-const STOP_SLACK = 40;
-let pendingMoveAt = 0;
-let gliding = false;
-let lastMoveSent = 0;
-
-function followWindow() {
-  const now = performance.now();
-  if (pendingMoveAt && now - pendingMoveAt < 400) return;
-  pendingMoveAt = 0;
-  if (now - lastMoveSent < 33) return;
-
-  const WIN_W = window.innerWidth;
-  const WIN_H = window.innerHeight;
-  const idealX = animator.bodyX - WIN_W / 2;
-  const idealY = animator.bodyY - WIN_H * 0.72;
-  const dx = idealX - origin.x;
-  const dy = idealY - origin.y;
-
-  if (!gliding) {
-    if (Math.abs(dx) <= START_SLACK_X && Math.abs(dy) <= START_SLACK_Y) return;
-    gliding = true;
-  } else if (Math.abs(dx) <= STOP_SLACK && Math.abs(dy) <= STOP_SLACK) {
-    gliding = false;
-    return;
-  }
-
-  const sx = Math.max(-MAX_STEP, Math.min(MAX_STEP, dx));
-  const sy = Math.max(-MAX_STEP, Math.min(MAX_STEP, dy));
-  let tx = Math.round(origin.x + sx);
-  let ty = Math.round(origin.y + sy);
-  tx = Math.min(Math.max(tx, workArea.x), workArea.x + workArea.width - WIN_W);
-  ty = Math.min(Math.max(ty, workArea.y), workArea.y + workArea.height - WIN_H);
-  if (tx !== origin.x || ty !== origin.y) {
-    pendingMoveAt = now;
-    lastMoveSent = now;
-    window.goose.send('move-window', { x: tx, y: ty });
-  } else {
-    gliding = false; // pinned against a screen edge
-  }
-}
-
-// ---- Main loop with a watchdog for rAF throttling ----
+// ---- Main loop ----
+// The window is static (full work area), so ALL motion is canvas animation:
+// no compositor mismatch, no jitter. Logic steps on every rAF with real dt;
+// drawing is capped at settings.fps (default 120, bounded by the display).
+// Dirty-rect discipline keeps the full-screen transparent canvas cheap: only
+// the region around the goose (plus bubble/VFX) is cleared and repainted.
 
 let lastFrame = performance.now();
+let lastDraw = 0;
 let stateReportT = 0;
+let prevDirty = null;
 
 function step(dt) {
   // The goose's mind pauses while it is being carried; it has other concerns.
@@ -276,7 +239,6 @@ function step(dt) {
   const state = animator.update(dt, intent, cursor);
   vfx.update(dt);
   bubble.update(dt, ctx);
-  followWindow();
   stateReportT -= dt;
   if (stateReportT <= 0) {
     stateReportT = 0.5;
@@ -285,17 +247,52 @@ function step(dt) {
   return state;
 }
 
+function contentRect(state) {
+  const S = settings.scale;
+  let x0 = state.bodyX - 0.85 * S;
+  let x1 = state.bodyX + 0.85 * S;
+  let y0 = state.bodyY - 1.25 * S;
+  let y1 = state.bodyY + 12;
+  for (const f of vfx.footprints) {
+    x0 = Math.min(x0, f.x - 26); x1 = Math.max(x1, f.x + 26);
+    y0 = Math.min(y0, f.y - 16); y1 = Math.max(y1, f.y + 10);
+  }
+  for (const h of vfx.honkLines) {
+    x0 = Math.min(x0, h.x - 100); x1 = Math.max(x1, h.x + 100);
+    y0 = Math.min(y0, h.y - 80); y1 = Math.max(y1, h.y + 80);
+  }
+  const bb = bubble.bounds();
+  if (bb) {
+    x0 = Math.min(x0, bb.x0); x1 = Math.max(x1, bb.x1);
+    y0 = Math.min(y0, bb.y0); y1 = Math.max(y1, bb.y1);
+  }
+  return { x0, y0, x1, y1 };
+}
+
 function frame(now) {
+  requestAnimationFrame(frame);
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
   const state = step(dt);
 
+  const minFrameMs = 1000 / (settings.fps || 120) - 1.5;
+  if (now - lastDraw < minFrameMs) return;
+  lastDraw = now;
+
   fitCanvas();
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
-  // World space (screen px), shifted by the follow-window origin.
+  // Clear only where content was and will be.
+  const cur = contentRect(state);
+  const d = prevDirty
+    ? { x0: Math.min(prevDirty.x0, cur.x0), y0: Math.min(prevDirty.y0, cur.y0),
+        x1: Math.max(prevDirty.x1, cur.x1), y1: Math.max(prevDirty.y1, cur.y1) }
+    : cur;
+  prevDirty = cur;
+  ctx.clearRect(d.x0 - origin.x - 2, d.y0 - origin.y - 2, (d.x1 - d.x0) + 4, (d.y1 - d.y0) + 4);
+
+  // World space (screen px), shifted by the static window origin.
   ctx.save();
   ctx.translate(-origin.x, -origin.y);
   vfx.drawFootprints(ctx);
@@ -310,8 +307,6 @@ function frame(now) {
   vfx.drawHonkLines(ctx);
   bubble.draw(ctx);
   ctx.restore();
-
-  requestAnimationFrame(frame);
 }
 
 // Keep behavior alive if rAF is throttled while occluded.

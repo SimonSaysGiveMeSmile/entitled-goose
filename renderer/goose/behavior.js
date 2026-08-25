@@ -49,6 +49,10 @@ export class Behavior {
     this.envEvents = [];
     this.envCooldowns = {}; // key → seconds remaining
     this.wasIdleSeconds = 0;
+    // Per-category toggles, mirrored from settings via the control panel.
+    this.awareness = { battery: true, time: true, reports: true, calendar: false };
+    this.calendarEvents = [];
+    this.calendarReminded = new Set();
 
     this.intent = { move: null, speedTier: 'walk', lookAt: null, faceCamera: false, showBubble: false, sleep: false };
   }
@@ -105,6 +109,11 @@ export class Behavior {
     this.env.charging = charging;
   }
 
+  onCalendar(events) {
+    this.calendarEvents = events || [];
+    if (this.calendarReminded.size > 80) this.calendarReminded.clear();
+  }
+
   // Runs each tick: event reactions + ambient awareness. Speaks sparingly —
   // awareness should feel observant, not chatty.
   updateEnv(dt) {
@@ -117,6 +126,7 @@ export class Behavior {
 
     while (this.envEvents.length) {
       const event = this.envEvents.shift();
+      if (!this.awareness.time) continue;
       if ((event === 'resume' || event === 'unlock') && this.envCooldownOk('greet', 120)) {
         const h = this.env.hour;
         let line = h < 6 ? 'it is the middle of the night. bold of us.'
@@ -140,8 +150,24 @@ export class Behavior {
       }
     }
 
+    // Calendar reminders: once per event, inside the 12-minute window.
+    if (this.awareness.calendar) {
+      for (const ev of this.calendarEvents) {
+        if (ev.minutesUntil > 12 || ev.minutesUntil < -1) continue;
+        const startBucket = Math.round((this.env.now + ev.minutesUntil * 60_000) / 300_000);
+        const key = ev.title + '|' + startBucket;
+        if (this.calendarReminded.has(key)) continue;
+        this.calendarReminded.add(key);
+        wake();
+        this.events.speak(ev.minutesUntil <= 1
+          ? `'${ev.title}' is NOW. go. GO.`
+          : `'${ev.title}' in ${ev.minutesUntil} minutes. go be a person.`);
+        this.anim.startAction('honk', { volume: 0.5, target: this.cursor });
+      }
+    }
+
     // Returned after an at-desk absence (no sleep/lock event involved).
-    if (this.wasIdleSeconds > 600 && this.env.idleSeconds < 10) {
+    if (this.awareness.time && this.wasIdleSeconds > 600 && this.env.idleSeconds < 10) {
       if (this.envCooldownOk('absence', 120)) {
         const mins = Math.round(this.wasIdleSeconds / 60);
         this.wasIdleSeconds = 0;
@@ -156,7 +182,7 @@ export class Behavior {
     // Battery concern: separate cooldown tiers so the emergency is never
     // throttled by the earlier nag. The 5% alarm wakes a sleeping goose.
     const pct = this.env.batteryPct;
-    if (pct != null && !this.env.charging) {
+    if (this.awareness.battery && pct != null && !this.env.charging) {
       if (pct <= 5 && this.envCooldownOk('battery5', 300)) {
         wake();
         this.events.speak('FIVE PERCENT. the nest is losing power. do something.');
@@ -167,13 +193,13 @@ export class Behavior {
     }
 
     // Machine under strain: sympathy, of a sort. (load1 is null on Windows.)
-    if (this.env.load1 != null && this.env.load1 > this.env.cpus * 1.5
+    if (this.awareness.time && this.env.load1 != null && this.env.load1 > this.env.cpus * 1.5
         && !asleep && this.envCooldownOk('load', 900)) {
       this.events.speak('your computer is wheezing. what did you do.');
     }
 
     // Deep night with the user still typing: judgment.
-    if (this.isNight && this.env.hour >= 1 && this.env.hour < 5 && !asleep
+    if (this.awareness.time && this.isNight && this.env.hour >= 1 && this.env.hour < 5 && !asleep
         && this.env.idleSeconds < 30 && this.envCooldownOk('latenight', 1800)) {
       this.events.speak(`it is ${this.timeString()}. even geese sleep. this is unwell.`);
     }
@@ -215,9 +241,9 @@ export class Behavior {
     this.gapT = 1.8;
   }
 
-  // Space switch: stage the illusion that the goose sprinted after you onto
-  // the new desktop — snap it back toward the nearer screen edge, then charge
-  // home. Throttled so rapid swipes don't stack sprints.
+  // Space switch: the goose sprints in AFTER YOU — it drops back away from
+  // your cursor and charges toward it, so the chase direction always reads
+  // correctly no matter which way you swiped. Throttled against rapid swipes.
   onSpaceChange() {
     if (this.anim.dragging) return;
     const now = performance.now() / 1000;
@@ -226,15 +252,18 @@ export class Behavior {
 
     const A = this.anim;
     const wa = this.workArea;
-    const homeX = A.bodyX;
-    const homeY = A.bodyY;
-    const dir = homeX < wa.x + wa.width / 2 ? -1 : 1; // lag toward nearer edge
-    A.bodyX = clamp(homeX + dir * 420, wa.x + 0.45 * A.S, wa.x + wa.width - 0.45 * A.S);
+    // Fall back away from the cursor (the goose "hasn't caught up yet")…
+    const away = Math.sign(A.bodyX - this.cursor.x) || 1;
+    A.bodyX = clamp(this.cursor.x + away * 520, wa.x + 0.45 * A.S, wa.x + wa.width - 0.45 * A.S);
     A.vx = 0;
     A.vy = 0;
-    A.facing = Math.sign(homeX - A.bodyX) || A.facing;
+    A.facing = Math.sign(this.cursor.x - A.bodyX) || A.facing;
     A.gait.reset(A.bodyX / A.S, A.facing);
-    this.task = this.makeTask('catchup', { x: homeX, y: homeY });
+    // …then charge to a spot right beside you.
+    this.task = this.makeTask('catchup', {
+      x: this.clampX(this.cursor.x + away * 170),
+      y: this.clampY(this.cursor.y + 150),
+    });
     this.gapT = 0;
   }
 
@@ -320,6 +349,7 @@ export class Behavior {
         return [name, weight];
       })
       .filter(([name, w]) => w > 0 && !(this.polite && name === 'demand'))
+      .filter(([name]) => name !== 'report' || this.awareness.reports)
       .filter(([name]) => (name !== 'speak' && name !== 'report') || this.speakCooldown <= 0);
     let total = entries.reduce((a, [, w]) => a + w, 0);
     let r = Math.random() * total;

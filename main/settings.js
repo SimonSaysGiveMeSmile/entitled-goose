@@ -8,7 +8,14 @@ const DEFAULTS = {
   grudgePending: false,
   focusEnforce: true, // the goose closes entertainment windows to keep you working
   footsteps: false, // quiet webbed taps on foot plants (off: they get old fast)
+  fps: 120, // max frame rate cap (actual rate limited by the display)
   scale: 170, // goose standing height in px
+  awareness: {
+    battery: true, // battery warnings
+    time: true, // time-of-day greetings, absence counting, late-night judgment
+    reports: true, // unsolicited status reports
+    calendar: false, // event reminders (prompts for Calendar automation permission)
+  },
 };
 
 const DEFAULT_NOTES = [
@@ -44,9 +51,14 @@ export function notesPath() {
 
 export function loadSettings() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsPath(), 'utf8')) };
+    const stored = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
+    return {
+      ...DEFAULTS,
+      ...stored,
+      awareness: { ...DEFAULTS.awareness, ...(stored.awareness || {}) },
+    };
   } catch {
-    return { ...DEFAULTS };
+    return { ...DEFAULTS, awareness: { ...DEFAULTS.awareness } };
   }
 }
 

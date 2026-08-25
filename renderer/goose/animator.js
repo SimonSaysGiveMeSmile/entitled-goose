@@ -11,6 +11,9 @@ import { evalTimeline, timelineDuration } from '../../shared/kf.js';
 import { GEO, neckRestPose } from './draw.js';
 
 const SPEEDS = { walk: 85, run: 210, charge: 330 }; // px/s
+// Per-joint neck bend limits (radians), base -> head: mobile at the base,
+// stiff near the skull so the head never hinges at a harsh angle.
+const NECK_BENDS = [0.75, 0.55, 0.40, 0.26];
 const ACCEL = 700;
 
 const TIMELINES = {
@@ -345,7 +348,7 @@ export class GooseAnimator {
     solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
     // Bend limits keep the chain kink-free at extreme reach angles so the
     // ribbon never creases or visually detaches from body or head.
-    limitBends(this.neckPts, this.neckLengths);
+    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.15, maxBend: NECK_BENDS });
     // Higher idle stiffness keeps the relaxed back-swept rest pose dominant.
     const stiffness = this.action ? 0.06 : this.sleepAmt > 0.5 ? 0.5 : 0.42;
     blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, stiffness);
@@ -404,7 +407,7 @@ export class GooseAnimator {
     this.neckPts[0].x = root.x;
     this.neckPts[0].y = root.y;
     solveFabrik(this.neckPts, this.neckLengths, { x: localTX, y: localTY });
-    limitBends(this.neckPts, this.neckLengths);
+    limitBends(this.neckPts, this.neckLengths, { maxRootBend: 1.15, maxBend: NECK_BENDS });
     blendToRest(this.neckPts, neckRestPose(bodyDY), this.neckLengths, 0.2);
 
     const tip = this.neckPts[this.neckPts.length - 1];

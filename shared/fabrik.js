@@ -61,9 +61,11 @@ export function solveFabrik(points, lengths, target, { iterations = 8, tolerance
   return points;
 }
 
-// Clamp the bend between consecutive segments to maxBend radians (and the
-// first segment to maxRootBend away from refDir). Prevents kinks and the
-// "disconnected neck" look at extreme reach angles. Lengths are preserved.
+// Clamp the bend between consecutive segments (and the first segment against
+// refDir). Prevents kinks and the "disconnected neck" look at extreme reach
+// angles. `maxBend` may be a per-joint array — a real goose neck is mobile at
+// the base and much stiffer near the skull, so limits should taper toward the
+// head. Lengths are preserved.
 export function limitBends(points, lengths, { maxBend = 0.62, maxRootBend = 0.95, refDir = { x: 0, y: -1 } } = {}) {
   const n = points.length;
   let prevAngle = Math.atan2(refDir.y, refDir.x);
@@ -71,7 +73,9 @@ export function limitBends(points, lengths, { maxBend = 0.62, maxRootBend = 0.95
     const dx = points[i].x - points[i - 1].x;
     const dy = points[i].y - points[i - 1].y;
     let angle = Math.atan2(dy, dx);
-    const limit = i === 1 ? maxRootBend : maxBend;
+    const limit = i === 1 ? maxRootBend
+      : Array.isArray(maxBend) ? maxBend[Math.min(i - 2, maxBend.length - 1)]
+      : maxBend;
     let delta = angle - prevAngle;
     while (delta > Math.PI) delta -= 2 * Math.PI;
     while (delta < -Math.PI) delta += 2 * Math.PI;

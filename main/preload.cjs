@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const SEND_CHANNELS = new Set([
-  'move-window',
   'goose-state',
   'click-through',
   'honked',
@@ -17,6 +16,7 @@ const ON_CHANNELS = new Set([
   'speak',
   'space-changed',
   'env',
+  'calendar',
 ]);
 
 contextBridge.exposeInMainWorld('goose', {

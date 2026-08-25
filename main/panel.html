@@ -110,6 +110,32 @@
     <label>Goose size</label>
     <input type="range" id="scale" min="120" max="260" step="10" />
   </div>
+  <div class="row">
+    <label>Max frame rate</label>
+    <select id="fps">
+      <option value="30">30 fps</option>
+      <option value="60">60 fps</option>
+      <option value="120">120 fps</option>
+    </select>
+  </div>
+
+  <div class="row" style="border-bottom: 0; padding-bottom: 2px;"><label><b>Awareness</b></label></div>
+  <div class="row">
+    <label>Battery warnings<div class="hint">"your battery is at 12%. charge it. I live here."</div></label>
+    <input type="checkbox" id="aw-battery" />
+  </div>
+  <div class="row">
+    <label>Time &amp; absence remarks<div class="hint">greetings, counted absences, 2am judgment</div></label>
+    <input type="checkbox" id="aw-time" />
+  </div>
+  <div class="row">
+    <label>Status reports<div class="hint">unsolicited. that's the point</div></label>
+    <input type="checkbox" id="aw-reports" />
+  </div>
+  <div class="row">
+    <label>Calendar reminders<div class="hint">10-min warnings; asks for Calendar permission</div></label>
+    <input type="checkbox" id="aw-calendar" />
+  </div>
 
   <div class="row" style="border: 0; display: block;">
     <label>Goose phrases <span class="hint">(one per line)</span> <span class="saved" id="saved">saved</span></label>
@@ -123,6 +149,7 @@
 <script>
   const $ = (id) => document.getElementById(id);
   let saveTimer = null;
+  let awareness = { battery: true, time: true, reports: true, calendar: false };
 
   async function load() {
     const s = await window.panel.getState();
@@ -131,6 +158,9 @@
     $('focusEnforce').checked = s.settings.focusEnforce;
     $('footsteps').checked = s.settings.footsteps;
     $('scale').value = s.settings.scale;
+    $('fps').value = String(s.settings.fps || 120);
+    awareness = { battery: true, time: true, reports: true, calendar: false, ...(s.settings.awareness || {}) };
+    for (const k of ['battery', 'time', 'reports', 'calendar']) $('aw-' + k).checked = awareness[k];
     $('phrases').value = (s.phrases || []).join('\n');
     updateMeter(s.meter, s.tier);
   }
@@ -144,6 +174,13 @@
     $(id).addEventListener('change', () => window.panel.setSettings({ [id]: $(id).checked }));
   }
   $('scale').addEventListener('change', () => window.panel.setSettings({ scale: Number($('scale').value) }));
+  $('fps').addEventListener('change', () => window.panel.setSettings({ fps: Number($('fps').value) }));
+  for (const k of ['battery', 'time', 'reports', 'calendar']) {
+    $('aw-' + k).addEventListener('change', () => {
+      awareness = { ...awareness, [k]: $('aw-' + k).checked };
+      window.panel.setSettings({ awareness });
+    });
+  }
 
   $('phrases').addEventListener('input', () => {
     clearTimeout(saveTimer);

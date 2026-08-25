@@ -23,6 +23,21 @@ export class SpeechBubble {
     return this.current !== null || this.queue.length > 0;
   }
 
+  // World-space rect currently occupied (for dirty-rect clearing), or null.
+  bounds() {
+    const c = this.current;
+    if (!c) return null;
+    const a = this.anchorFn();
+    const bx = a.x + (a.facing || 1) * 26;
+    const by = a.y - 58 - c.h / 2;
+    return {
+      x0: bx - c.w / 2 - 12,
+      y0: by - c.h / 2 - 12,
+      x1: bx + c.w / 2 + 12,
+      y1: by + c.h / 2 + 48, // tail reaches down toward the anchor
+    };
+  }
+
   update(dt, measureCtx) {
     if (!this.current && this.queue.length) {
       const text = this.queue.shift();

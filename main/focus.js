@@ -250,21 +250,39 @@ export class FocusWarden {
   }
 
   async emit(label, appName, closer, cooldownKey) {
-    // The goose walks to the window's close-button corner (top-left on macOS,
-    // where the traffic lights and tab X live) and pecks before we close.
+    // The goose pecks the ACTUAL close button of what we close: the selected
+    // tab's X (left edge of the tab via the AX tree). Fallback: the window's
+    // red traffic-light corner.
     let targetX = null;
     let targetY = null;
     try {
-      const pos = await osascript(
-        `tell application "System Events" to tell process "${appName}" to get position of front window`
+      const tab = await osascript(
+        `tell application "System Events" to tell process "${appName}"
+           set tg to first tab group of front window
+           set rb to first radio button of tg whose value is 1
+           set p to position of rb
+           set s to size of rb
+           return (item 1 of p as text) & "," & (item 2 of p as text) & "," & (item 2 of s as text)
+         end tell`
       );
-      const [px, py] = pos.split(',').map((n) => parseInt(n, 10));
-      if (Number.isFinite(px) && Number.isFinite(py)) {
-        // The red close button (traffic lights) — the visual "close" target.
-        targetX = px + 27;
-        targetY = py + 26;
+      const [tx, ty, th] = tab.split(',').map((n) => parseInt(n, 10));
+      if (Number.isFinite(tx) && Number.isFinite(ty)) {
+        targetX = tx + 14; // macOS tab close X sits at the tab's left edge
+        targetY = ty + (Number.isFinite(th) ? th / 2 : 14);
       }
-    } catch { /* fine: the goose will improvise */ }
+    } catch { /* tab bar not exposed; fall through to the traffic lights */ }
+    if (targetX == null) {
+      try {
+        const pos = await osascript(
+          `tell application "System Events" to tell process "${appName}" to get position of front window`
+        );
+        const [px, py] = pos.split(',').map((n) => parseInt(n, 10));
+        if (Number.isFinite(px) && Number.isFinite(py)) {
+          targetX = px + 27;
+          targetY = py + 26;
+        }
+      } catch { /* fine: the goose will improvise */ }
+    }
 
     const id = this.nextId++;
     this.pending.set(id, { closer, label });
