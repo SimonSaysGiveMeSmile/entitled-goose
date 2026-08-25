@@ -1,0 +1,16 @@
+{
+  "name": "entitled-goose",
+  "version": "0.1.0",
+  "description": "A desktop pet goose that acts like it owns your desktop. Original art & audio; not affiliated with House House, Panic, or samperson.",
+  "main": "main/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test"
+  },
+  "author": "tianjiahe11@gmail.com",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.4.1"
+  }
+}
