@@ -170,16 +170,21 @@ export class GooseAnimator {
   }
 
   bounds() {
-    // Dynamic: the reach-extended head/beak must stay inside the pointer
-    // hit-zone (click-through and poke/pet/drag all gate on this rect), so
-    // grow the box to wherever the head actually is (+0.30S covers the
-    // 0.261S beak tip plus the skull on either side).
+    // STATIC, body-anchored hit-zone. It must NEVER follow the tracking
+    // head: the head follows the cursor, so a head-following zone contains
+    // the cursor by construction — the overlay goes solid under the pointer
+    // and eats every click near the goose (v0.3.4 regression: "input laggy
+    // and erroring"). Forward covers the REST head + beak; the cursor-
+    // chasing head beyond that is intentionally visual-only click-through.
     const S = this.S;
-    const h = this.headWorld();
-    const x0 = Math.min(this.bodyX - 0.55 * S, h.x - 0.30 * S);
-    const x1 = Math.max(this.bodyX + 0.55 * S, h.x + 0.30 * S);
-    const y0 = Math.min(this.bodyY - 1.06 * S, h.y - 0.15 * S);
-    return { x: x0, y: y0, w: x1 - x0, h: this.bodyY - y0 + 0.02 * S };
+    const fwd = this.facing >= 0 ? 0.68 : 0.55;
+    const back = this.facing >= 0 ? 0.55 : 0.68;
+    return {
+      x: this.bodyX - back * S,
+      y: this.bodyY - 1.06 * S,
+      w: (back + fwd) * S,
+      h: 1.08 * S,
+    };
   }
 
   minBodyY() {
