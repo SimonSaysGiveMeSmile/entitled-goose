@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell, nativeImage, dialog, systemPreferences } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell, nativeImage, dialog, systemPreferences, powerMonitor } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadSettings, saveSettings, loadNotes, saveNotes, notesPath } from './settings.js';
@@ -98,6 +98,13 @@ function createWindow() {
     win.showInactive();
     applyOverlayFlags(); // re-assert on-top level after show (order matters on macOS)
   });
+
+  // Graphics self-heal: a dead renderer must come back (the goose vanishes
+  // otherwise), and a dead GPU process leaves corrupted compositor tiles
+  // (red boxes) on the transparent overlay until a forced repaint.
+  win.webContents.on('render-process-gone', () => {
+    if (win && !win.isDestroyed()) win.webContents.reload();
+  });
 }
 
 function buildTray() {
@@ -182,6 +189,15 @@ app.whenReady().then(() => {
   if (app.dock) app.dock.hide();
   createWindow();
   buildTray();
+
+  // Compositor self-heal: repaint after GPU-process death and after wake —
+  // both are moments transparent overlays get left with garbage tiles.
+  app.on('child-process-gone', (_e, details) => {
+    if (details.type === 'GPU' && win && !win.isDestroyed()) win.webContents.invalidate();
+  });
+  for (const ev of ['resume', 'unlock-screen']) {
+    powerMonitor.on(ev, () => { if (win && !win.isDestroyed()) win.webContents.invalidate(); });
+  }
 
   // Global cursor position: permission-free polling from the main process.
   // Also: multi-display follow — if the cursor dwells on another display for

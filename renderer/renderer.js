@@ -8,6 +8,13 @@ import { drawGoose } from './goose/draw.js';
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
 
+// GPU self-heal: under graphics memory pressure Chromium can lose the canvas
+// context and composite stale tiles as uniform red garbage (observed live as
+// a big red box on the overlay). Accept restoration and force a fresh
+// surface — the frame loop repaints everything anyway.
+canvas.addEventListener('contextlost', (e) => e.preventDefault());
+canvas.addEventListener('contextrestored', () => { canvas.width = 0; fitCanvas(); });
+
 let origin = { x: 0, y: 0 };
 let workArea = null;
 let settings = { muted: false, polite: false, scale: 170 };
