@@ -56,7 +56,9 @@ async function boot() {
   });
   bubble = new SpeechBubble(() => {
     const head = animator.headWorld();
-    return { x: head.x, y: head.y, facing: animator.facing };
+    // topY lets the bubble clamp itself inside the window — with the taller
+    // neck a head near the menu bar would push the bubble entirely off-screen.
+    return { x: head.x, y: head.y, facing: animator.facing, topY: workArea.y };
   });
   behavior = new Behavior({
     animator,

@@ -5,6 +5,7 @@
 // screen (2D move targets) and talks via a speech bubble that follows it.
 
 import { clamp } from '../../shared/spring.js';
+import { GEO } from './draw.js';
 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -417,7 +418,7 @@ export class Behavior {
     const wa = this.workArea;
     // Fall back away from the cursor (the goose "hasn't caught up yet")…
     const away = Math.sign(A.bodyX - this.cursor.x) || 1;
-    A.bodyX = clamp(this.cursor.x + away * 520, wa.x + 0.45 * A.S, wa.x + wa.width - 0.45 * A.S);
+    A.bodyX = clamp(this.cursor.x + away * 520, wa.x + 0.52 * A.S, wa.x + wa.width - 0.52 * A.S);
     A.vx = 0;
     A.vy = 0;
     A.facing = Math.sign(this.cursor.x - A.bodyX) || A.facing;
@@ -776,7 +777,8 @@ export class Behavior {
         return {
           name, update(dt) {
             const icon = B._batteryIcon || { x: B.workArea.x + B.workArea.width - 130, y: B.workArea.y + 12 };
-            const stand = { x: B.clampX(icon.x - 30, 120), y: B.anim.minBodyY() };
+            // Rest head stops 0.12S short of the icon; the honk points up at it.
+            const stand = { x: B.clampX(icon.x - (GEO.restHead.x + 0.12) * A.S, 120), y: B.anim.minBodyY() };
             if (phase === 'walk') {
               if (!B.near(stand, 14)) {
                 B.intent.move = stand;
@@ -824,10 +826,12 @@ export class Behavior {
           x: B.clampX(opts.x ?? B.cursor.x, 140),
           y: opts.y != null ? opts.y : B.workArea.y + B.workArea.height * 0.25,
         };
-        // Stand just right of the button so the extended beak lands ON it.
+        // Stand so the REST head sits 0.20S beyond and 0.19S below the
+        // button — the honk lunge is then a clean up-forward peck that lands
+        // the beak ON it. Derived from GEO so rig changes can't strand it.
         const target = {
-          x: B.clampX(btn.x + 58, 130),
-          y: B.clampY(btn.y + 0.92 * A.S),
+          x: B.clampX(btn.x + (GEO.restHead.x + 0.20) * A.S, 130),
+          y: B.clampY(btn.y + (-GEO.restHead.y + 0.19) * A.S),
         };
         let phase = 'charge';
         let warned = false;

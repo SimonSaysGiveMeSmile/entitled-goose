@@ -115,7 +115,7 @@ function drawNeck(ctx, pts, color) {
   end.x -= ((end.x - prev2.x) / el) * 0.014;
   end.y -= ((end.y - prev2.y) / el) * 0.014;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 0.107; // site stroke-width 16
+  ctx.lineWidth = 0.096; // site stroke-width 16, then -10% per user taste
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();

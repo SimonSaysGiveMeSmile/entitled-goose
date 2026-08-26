@@ -29,7 +29,7 @@ export class SpeechBubble {
     if (!c) return null;
     const a = this.anchorFn();
     const bx = a.x + (a.facing || 1) * 26;
-    const by = a.y - 58 - c.h / 2;
+    const by = bubbleY(a, c);
     return {
       x0: bx - c.w / 2 - 12,
       y0: by - c.h / 2 - 12,
@@ -70,7 +70,7 @@ export class SpeechBubble {
 
     // Sits well above the head, on the side the character faces.
     const bx = a.x + (a.facing || 1) * 26;
-    const by = a.y - 58 - c.h / 2;
+    const by = bubbleY(a, c);
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -103,6 +103,13 @@ export class SpeechBubble {
     });
     ctx.restore();
   }
+}
+
+// Above the head, but never above the window top — the overlay covers the
+// workArea exactly, so anything higher is clipped invisible.
+function bubbleY(a, c) {
+  const natural = a.y - 58 - c.h / 2;
+  return a.topY != null ? Math.max(natural, a.topY + c.h / 2 + 10) : natural;
 }
 
 function wrap(ctx, text, maxWidth) {

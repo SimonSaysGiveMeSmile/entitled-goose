@@ -170,13 +170,16 @@ export class GooseAnimator {
   }
 
   bounds() {
+    // Dynamic: the reach-extended head/beak must stay inside the pointer
+    // hit-zone (click-through and poke/pet/drag all gate on this rect), so
+    // grow the box to wherever the head actually is (+0.30S covers the
+    // 0.261S beak tip plus the skull on either side).
     const S = this.S;
-    return {
-      x: this.bodyX - 0.55 * S,
-      y: this.bodyY - 1.06 * S,
-      w: 1.10 * S,
-      h: 1.08 * S,
-    };
+    const h = this.headWorld();
+    const x0 = Math.min(this.bodyX - 0.55 * S, h.x - 0.30 * S);
+    const x1 = Math.max(this.bodyX + 0.55 * S, h.x + 0.30 * S);
+    const y0 = Math.min(this.bodyY - 1.06 * S, h.y - 0.15 * S);
+    return { x: x0, y: y0, w: x1 - x0, h: this.bodyY - y0 + 0.02 * S };
   }
 
   minBodyY() {
@@ -201,7 +204,7 @@ export class GooseAnimator {
       [this.bodyX, this.vx] = springDamp(this.bodyX, this.vx, grabX, 0.07, dt);
       [this.bodyY, this.vy] = springDamp(this.bodyY, this.vy, grabY, 0.07, dt);
       const wa = this.workArea;
-      this.bodyX = clamp(this.bodyX, wa.x + 0.3 * S, wa.x + wa.width - 0.3 * S);
+      this.bodyX = clamp(this.bodyX, wa.x + 0.52 * S, wa.x + wa.width - 0.52 * S);
       this.bodyY = clamp(this.bodyY, wa.y + 0.55 * S, this.maxBodyY());
       if (Math.abs(this.bodyX - oldX) > 1) this.facing = Math.sign(this.bodyX - oldX) || this.facing;
       this.gait.update(dt, this.bodyX / S, 0, this.facing); // settle feet math
@@ -246,7 +249,7 @@ export class GooseAnimator {
     }
     this.bodyX += this.vx * dt;
     this.bodyY += this.vy * dt;
-    const margin = 0.45 * S;
+    const margin = 0.52 * S; // tail spike reaches -0.495 local
     this.bodyX = clamp(this.bodyX, this.workArea.x + margin, this.workArea.x + this.workArea.width - margin);
     this.bodyY = clamp(this.bodyY, this.minBodyY(), this.maxBodyY());
     speed = Math.hypot(this.vx, this.vy);
@@ -342,11 +345,11 @@ export class GooseAnimator {
       // the neck keeps a curve, fine-grained retargeting (14px at default
       // scale — coarse thresholds make tracking notchy), and the site's
       // first-order integrator below instead of the second-order spring.
-      // Reach floor 0.30S keeps the drawn head outside the chest silhouette
-      // (verified against the body bezier; lower floors bury the head when
-      // the cursor hovers the goose). Near the root, direction is noise —
-      // hold the last look instead of whipping around the shoulder.
-      const r = Math.min(d, 0.549 * S); // site: r = min(d, REACH), no floor
+      // Reach floor keeps the drawn head outside the chest silhouette when
+      // the cursor hovers the goose (new chest front x=0.401 → floor 0.44S;
+      // the site has no floor but its goose is decorative, ours is petted).
+      // Near the root, direction is noise — hold the last look instead.
+      const r = clamp(d, 0.44 * S, 0.549 * S);
       let tx = root.x + (dx / d) * r;
       // Site head-dip clamp (shoulder.y + 24): gaze goes down, the head
       // itself stays up — pecks reach lower via the action branch.
@@ -406,8 +409,8 @@ export class GooseAnimator {
     [this.tailWag, this.tailV] = springDamp(this.tailWag, this.tailV, wagTarget, 0.10, dt);
 
     // ---- Neck solve (local space) ----
-    // Sleep sink stops at the belly touching the ground (belly is at -0.105).
-    const bodyDY = this.gait.bob + squash * 0.035 + this.sleepAmt * 0.095 - Math.sin(this.breathT * 3.1) * 0.004;
+    // Sleep sink stops at the belly touching the ground (belly is at -0.140).
+    const bodyDY = this.gait.bob + squash * 0.035 + this.sleepAmt * 0.135 - Math.sin(this.breathT * 3.1) * 0.004;
     const root = { x: GEO.neckRoot.x, y: GEO.neckRoot.y + bodyDY };
     const localT = clampNeckTarget(root,
       ((this.headWX - this.bodyX) / S) * this.facing,
@@ -429,8 +432,9 @@ export class GooseAnimator {
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
     const headAngle = clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.157, -0.227, 0.227);
-    this.headDrawWX = this.bodyX + (tip.x + ux * 0.012) * S * this.facing;
-    this.headDrawWY = this.bodyY + (tip.y + uy * 0.012) * S;
+    // +0.013/-0.020: the site's skull group offset translate(+2,-3).
+    this.headDrawWX = this.bodyX + (tip.x + ux * 0.012 + 0.013) * S * this.facing;
+    this.headDrawWY = this.bodyY + (tip.y + uy * 0.012 - 0.020) * S;
 
     return {
       bodyX: this.bodyX,
@@ -440,7 +444,7 @@ export class GooseAnimator {
       roll: this.gait.roll,
       tailWag: this.tailWag * 0.05,
       neckPts: this.neckPts,
-      head: { x: tip.x + ux * 0.012, y: tip.y + uy * 0.012 },
+      head: { x: tip.x + ux * 0.012 + 0.013, y: tip.y + uy * 0.012 - 0.020 },
       headAngle,
       beakOpen: this.beakOpen,
       eyelid: this.eyelid,
@@ -460,7 +464,9 @@ export class GooseAnimator {
 
     // Head strains upward while the body dangles.
     this.headTX = this.bodyX + this.facing * 0.06 * S;
-    this.headTY = this.bodyY - 0.92 * S;
+    // Strain upward, but never past the window top — the overlay is exactly
+    // the workArea, so anything above it is clipped invisible.
+    this.headTY = Math.max(this.bodyY - 0.92 * S, this.workArea.y + 0.14 * S);
     [this.headWX, this.headVX] = springDamp(this.headWX, this.headVX, this.headTX, 0.10, dt);
     [this.headWY, this.headVY] = springDamp(this.headWY, this.headVY, this.headTY, 0.10, dt);
     [this.beakOpen, this.beakV] = springDamp(this.beakOpen, this.beakV, this.dragAmt * 0.35, 0.06, dt);
@@ -481,8 +487,9 @@ export class GooseAnimator {
     const ul = Math.hypot(ux, uy) || 1;
     ux /= ul; uy /= ul;
 
-    this.headDrawWX = this.bodyX + (tip.x + ux * 0.012) * S * this.facing;
-    this.headDrawWY = this.bodyY + (tip.y + uy * 0.012) * S;
+    // +0.013/-0.020: the site's skull group offset translate(+2,-3).
+    this.headDrawWX = this.bodyX + (tip.x + ux * 0.012 + 0.013) * S * this.facing;
+    this.headDrawWY = this.bodyY + (tip.y + uy * 0.012 - 0.020) * S;
 
     // Dangling legs: feet hang below the hips with a velocity sway.
     const sway = clamp(-this.vx * 0.0004, -0.08, 0.08);
@@ -501,7 +508,7 @@ export class GooseAnimator {
       roll: pitch,
       tailWag: this.tailWag * 0.05,
       neckPts: this.neckPts,
-      head: { x: tip.x + ux * 0.012, y: tip.y + uy * 0.012 },
+      head: { x: tip.x + ux * 0.012 + 0.013, y: tip.y + uy * 0.012 - 0.020 },
       headAngle: clamp((Math.atan2(uy, ux) + Math.PI / 2) * 0.157, -0.227, 0.227),
       beakOpen: this.beakOpen,
       eyelid: 0,
